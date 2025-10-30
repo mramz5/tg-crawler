@@ -1,0 +1,168 @@
+package org.drinkless.tdlib;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.NavigableSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class ChatUtil {
+
+    static void getMessagesByKeywordsInChannelTitle(Client client,
+                                                    String channelName,
+                                                    String[] keywords,
+                                                    TPage page,
+                                                    Client.ResultHandler defaultHandler) {
+        client.send(new TdApi.SearchPublicChat(channelName), object -> {
+            if (TdApi.Error.CONSTRUCTOR == object.getConstructor()) {
+                sendMessage(getChatId(channelName), "channel '" + channelName + "' not found", client, defaultHandler);
+                return;
+            }
+            TdApi.Chat chat = (TdApi.Chat) object;
+            TdApi.ChatType chatType = chat.type;
+            if (!(chatType.getConstructor() == TdApi.ChatTypeSupergroup.CONSTRUCTOR) ||
+                    !((TdApi.ChatTypeSupergroup) chatType).isChannel) {
+                sendMessage(getChatId(channelName), "'" + channelName + "'is not a channel", client, defaultHandler);
+                return;
+            }
+            getMessagesByKeywords(client, chat.id, keywords, page);
+        });
+    }
+
+    private static void getMessagesByKeywords(Client client,
+                                              long chatId,
+                                              String[] keywords,
+                                              TPage page) {
+        ChatPaginator paginator = new ChatPaginator(client, chatId, page.pageSize);
+        CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+
+        TdApi.FoundChatMessages[] messages = {null};
+        for (String keyword : keywords) {
+            for (int i = 1; i <= page.pageNumber; i++) {
+                chain = chain.thenCompose(v -> paginator.getPage(keyword))
+                        .thenAccept(_messages -> messages[0] = _messages);
+            }
+        }
+        chain.thenRun(() -> System.out.println(
+                Arrays.stream(messages[0].messages)
+                .map(MessageMapper::toDTO)
+                .toList().subList(1, messages[0].messages.length)));
+
+    }
+
+//    static TdApi.Chat getChannelByTitle(Client client,
+//                                        String chatName,
+//                                        Client.ResultHandler defaultHandler) {
+//        TdApi.Chat[] channel = new TdApi.Chat[1];
+//        client.send(new TdApi.SearchPublicChat(chatName), object -> {
+//            if (TdApi.Error.CONSTRUCTOR == object.getConstructor()) {
+//                sendMessage(getChatId(chatName), "channel '" + chatName + "' not found", client, defaultHandler);
+//                return;
+//            }
+//            TdApi.Chat chat = (TdApi.Chat) object;
+//            TdApi.ChatType chatType = chat.type;
+//            if (!(chatType.getConstructor() == TdApi.ChatTypeSupergroup.CONSTRUCTOR) ||
+//                    !((TdApi.ChatTypeSupergroup) chatType).isChannel) {
+//                sendMessage(getChatId(chatName), "'" + chatName + "'is not a channel", client, defaultHandler);
+//                return;
+//            }
+//            channel[0] = chat;
+//        });
+//        return channel[0];
+//    }
+
+    static void sendMessage(long chatId,
+                            String message,
+                            Client client,
+                            Client.ResultHandler defaultHandler) {
+        // initialize reply markup just for testing
+        TdApi.InlineKeyboardButton[] row = {
+                new TdApi.InlineKeyboardButton("https://telegram.org?1", new TdApi.InlineKeyboardButtonTypeUrl()),
+                new TdApi.InlineKeyboardButton("https://telegram.org?2", new TdApi.InlineKeyboardButtonTypeUrl()),
+                new TdApi.InlineKeyboardButton("https://telegram.org?3", new TdApi.InlineKeyboardButtonTypeUrl())
+        };
+        TdApi.ReplyMarkup replyMarkup = new TdApi.ReplyMarkupInlineKeyboard(new TdApi.InlineKeyboardButton[][]{row, row, row});
+
+        TdApi.InputMessageContent content = new TdApi.InputMessageText(new TdApi.FormattedText(message, null), null, true);
+        client.send(new TdApi.SendMessage(chatId, 0, null, null, replyMarkup, content), defaultHandler);
+    }
+
+    static void getMainChatList(final int limit,
+                                Client client,
+                                NavigableSet<Example.OrderedChat> mainChatList,
+                                boolean haveFullMainChatList,
+                                String newLine,
+                                ConcurrentMap<Long, TdApi.Chat> chats,
+                                Client.ResultHandler defaultHandler) {
+        AtomicBoolean atomicBoolean = new AtomicBoolean(haveFullMainChatList);
+        synchronized (mainChatList) {
+            if (!atomicBoolean.get() && limit > mainChatList.size()) {
+                // send LoadChats request if there are some unknown chats and have not enough known chats
+                client.send(new TdApi.LoadChats(new TdApi.ChatListMain(), limit - mainChatList.size()), object -> {
+                    switch (object.getConstructor()) {
+                        case TdApi.Error.CONSTRUCTOR:
+                            if (((TdApi.Error) object).code == 404) {
+                                synchronized (mainChatList) {
+                                    atomicBoolean.set(true);
+                                }
+                            } else {
+                                System.err.println("Receive an error for LoadChats:" + newLine + object);
+                            }
+                            break;
+                        case TdApi.Ok.CONSTRUCTOR:
+                            // chats had already been received through updates, let's retry request
+                            getMainChatList(limit, client, mainChatList, haveFullMainChatList, newLine, chats, defaultHandler);
+                            break;
+                        default:
+                            System.err.println("Receive wrong response from TDLib:" + newLine + object);
+                    }
+                });
+                return;
+            }
+
+            java.util.Iterator<Example.OrderedChat> iter = mainChatList.iterator();
+            System.out.println();
+            System.out.println("First " + limit + " chat(s) out of " + mainChatList.size() + " known chat(s):");
+            for (int i = 0; i < limit && i < mainChatList.size(); i++) {
+                long chatId = iter.next().chatId;
+                TdApi.Chat chat = chats.get(chatId);
+                synchronized (chat) {
+                    System.out.println(chatId + ": " + chat.title);
+                }
+            }
+        }
+    }
+
+    static long getChatId(String arg) {
+        long chatId = 0;
+        try {
+            chatId = Long.parseLong(arg);
+        } catch (NumberFormatException ignored) {
+        }
+        return chatId;
+    }
+
+    static void setChatPositions(TdApi.Chat chat, TdApi.ChatPosition[] positions, NavigableSet<Example.OrderedChat> mainChatList) {
+        synchronized (mainChatList) {
+            synchronized (chat) {
+                for (TdApi.ChatPosition position : chat.positions) {
+                    if (position.list.getConstructor() == TdApi.ChatListMain.CONSTRUCTOR) {
+                        boolean isRemoved = mainChatList.remove(new Example.OrderedChat(chat.id, position));
+                        assert isRemoved;
+                    }
+                }
+
+                chat.positions = positions;
+
+                for (TdApi.ChatPosition position : chat.positions) {
+                    if (position.list.getConstructor() == TdApi.ChatListMain.CONSTRUCTOR) {
+                        boolean isAdded = mainChatList.add(new Example.OrderedChat(chat.id, position));
+                        assert isAdded;
+                    }
+                }
+            }
+        }
+    }
+}
+
