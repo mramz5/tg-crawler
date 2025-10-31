@@ -17,4 +17,17 @@ public class MessageDTO {
                 " ,\n\tdate=" + ts[0] + "-" + ts[1] +
                 "\n}";
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+
+        MessageDTO that = (MessageDTO) o;
+        return id == that.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Long.hashCode(id);
+    }
 }

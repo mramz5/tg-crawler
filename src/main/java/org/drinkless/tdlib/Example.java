@@ -7,13 +7,12 @@
 package org.drinkless.tdlib;
 
 
+import javax.swing.*;
 import java.io.BufferedReader;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.NavigableSet;
-import java.util.Objects;
-import java.util.Properties;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -60,22 +59,36 @@ public final class Example {
              gc <chatId> - GetChat,
              me - GetMe,
              sm <chatId> <message> - SendMessage,
-             scw <chat name comma separated> <keywords comma separated> [size] [page-number] - search chats for given keywords,
+             scw <chat name comma separated> <keywords comma separated> [size] - search chats for given keywords,
              lo - LogOut,
              q - Quit
             ):\s""";
+    private static final String warningsLine = """
+            WARNING!
+            DO NOT LOG INTO YOUR ACCOUNT FROM TOO MANY DEVICES,
+            AS THIS MAY PREVENT NEW DEVICES FROM SENDING REQUESTS TO THE SERVER.
+            ====================================================================
+            """;
     private static volatile String currentPrompt = null;
+    private static JTextPane pane;
 
     private static void print(String str) {
         if (currentPrompt != null) {
+//            appendLine(pane,TerminalApp.formattedUserLine(""));
             System.out.println("");
         }
+//        appendLine(pane,TerminalApp.formattedUserLine(str));
         System.out.println(str);
         if (currentPrompt != null) {
             System.out.print(currentPrompt);
+//            appendLine(pane,TerminalApp.formattedUserLine(currentPrompt));
+
         }
     }
 
+    public static void setPane(JTextPane pane) {
+        Example.pane = pane;
+    }
 
     private static void onAuthorizationStateUpdated(TdApi.AuthorizationState authorizationState) {
         if (authorizationState != null) {
@@ -102,6 +115,7 @@ public final class Example {
             }
             case TdApi.AuthorizationStateWaitOtherDeviceConfirmation.CONSTRUCTOR: {
                 String link = ((TdApi.AuthorizationStateWaitOtherDeviceConfirmation) Example.authorizationState).link;
+//                appendLine(pane,TerminalApp.formattedUserLine("Please confirm this login link on another device: " + link));
                 System.out.println("Please confirm this login link on another device: " + link);
                 break;
             }
@@ -157,6 +171,7 @@ public final class Example {
                 }
                 break;
             default:
+//                appendLine(pane,TerminalApp.formattedUserLine("Unsupported authorization state:" + newLine + Example.authorizationState));
                 System.err.println("Unsupported authorization state:" + newLine + Example.authorizationState);
         }
     }
@@ -172,6 +187,8 @@ public final class Example {
 
 
     private static String promptString(String prompt) {
+//        TerminalApp.StyledString styledString = TerminalApp.formattedUserLine(prompt);
+//        appendLine(pane,styledString);
         System.out.print(prompt);
         currentPrompt = prompt;
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
@@ -182,10 +199,13 @@ public final class Example {
             e.printStackTrace();
         }
         currentPrompt = null;
-        return str;
+        String trimmed = str.trim();
+//        styledString = TerminalApp.formattedUserLine(trimmed);
+//        appendLine(pane,styledString);
+        return trimmed;
     }
 
-    private static void getCommand() {
+     static void getCommand() {
         String command = promptString(commandsLine);
         String[] commands = command.split(" ");
         try {
@@ -218,19 +238,23 @@ public final class Example {
                     client.send(new TdApi.Close(), defaultHandler);
                     break;
                 case "scw":
-                    // scw akharinkhabar پلیس 10 2
+                    // scw akharinkhabar,Tasnimnews سرقت,آگاهی 5 5
                     String[] chatNameList = commands[1].split(",");
                     String[] keywords = commands[2].split(",");
-                    int size = 0, pageNumber = 0;
-                    if (commands.length > 2) {
+                    int size = 0, numberOfPages = 0;
+                    if (commands.length > 3)
                         size = Integer.parseInt(commands[3]);
-                        if (commands.length > 3)
-                            pageNumber = Integer.parseInt(commands[4]);
-                    }
+                    if (commands.length > 4)
+                        numberOfPages = Integer.parseInt(commands[4]);
                     for (String chatName : chatNameList)
-                        getMessagesByKeywordsInChannelTitle(client, chatName, keywords, TPage.of(0,pageNumber,size,0), defaultHandler);
+                        getMessagesByKeywordsInChannelTitle(client,
+                                chatName,
+                                keywords,
+                                TPage.of(0, numberOfPages, size, 0),
+                                defaultHandler);
                     break;
                 default:
+//                    appendLine(pane,TerminalApp.formattedUserLine("Unsupported command: " + command));
                     System.err.println("Unsupported command: " + command);
             }
         } catch (ArrayIndexOutOfBoundsException e) {
@@ -239,39 +263,47 @@ public final class Example {
     }
 
 
-    public static void main(String[] args) throws InterruptedException, IOException {
-        // set log message handler to handle only fatal errors (0) and plain log messages (-1)
-        Client.setLogMessageHandler(0, new LogMessageHandler());
-
-        // disable TDLib log and redirect fatal errors and plain log messages to a file
+    public static void main(String[] args) {
         try {
-            Client.execute(new TdApi.SetLogVerbosityLevel(0));
-            Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27, false)));
-        } catch (Client.ExecutionException error) {
-            throw new IOError(new IOException("Write access to the current directory is required"));
-        }
+            // set log message handler to handle only fatal errors (0) and plain log messages (-1)
+            Client.setLogMessageHandler(0, new LogMessageHandler());
 
-        // create client
-        client = Client.create(new UpdateHandler(), null, null);
-
-        // main loop
-        while (!needQuit) {
-            // await authorization
-            authorizationLock.lock();
+            // disable TDLib log and redirect fatal errors and plain log messages to a file
             try {
-                while (!haveAuthorization) {
-                    gotAuthorization.await();
-                }
-            } finally {
-                authorizationLock.unlock();
+                Client.execute(new TdApi.SetLogVerbosityLevel(0));
+                Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27, false)));
+            } catch (Client.ExecutionException error) {
+                throw new IOError(new IOException("Write access to the current directory is required"));
             }
 
-            while (haveAuthorization) {
-                getCommand();
+            // create client
+            client = Client.create(new UpdateHandler(), null, null);
+
+            // main loop
+            while (!needQuit) {
+//                appendLine(pane, formattedSystemLine("Tips: ↑/↓ history • Ctrl+L clear • Ctrl+R toggle input RTL/LTR."));
+
+//                appendLine(pane,TerminalApp.formattedWarnLine(warningsLine));
+                System.out.println(warningsLine);
+                // await authorization
+                authorizationLock.lock();
+                try {
+                    while (!haveAuthorization) {
+                        gotAuthorization.await();
+                    }
+                } finally {
+                    authorizationLock.unlock();
+                }
+
+                while (haveAuthorization) {
+                    getCommand();
+                }
             }
-        }
-        while (!canQuit) {
-            Thread.sleep(1);
+            while (!canQuit) {
+                Thread.sleep(1);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -628,6 +660,7 @@ public final class Example {
         public void onResult(TdApi.Object object) {
             switch (object.getConstructor()) {
                 case TdApi.Error.CONSTRUCTOR:
+//                    appendLine(pane,TerminalApp.formattedUserLine("Receive an error:" + newLine + object));
                     System.err.println("Receive an error:" + newLine + object);
                     onAuthorizationStateUpdated(null); // repeat last action
                     break;
@@ -635,6 +668,7 @@ public final class Example {
                     // result is already received through UpdateAuthorizationState, nothing to do
                     break;
                 default:
+//                    appendLine(pane,TerminalApp.formattedUserLine("Receive wrong response from TDLib:" + newLine + object));
                     System.err.println("Receive wrong response from TDLib:" + newLine + object);
             }
         }
@@ -647,6 +681,7 @@ public final class Example {
                 onFatalError(message);
                 return;
             }
+//            appendLine(pane,TerminalApp.formattedUserLine(message));
             System.err.println(message);
         }
     }

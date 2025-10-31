@@ -1,13 +1,13 @@
 package org.drinkless.tdlib;
 
-import java.util.Arrays;
-import java.util.List;
+import javax.swing.*;
 import java.util.NavigableSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ChatUtil {
+    private static JTextPane pane;
 
     static void getMessagesByKeywordsInChannelTitle(Client client,
                                                     String channelName,
@@ -34,43 +34,14 @@ public class ChatUtil {
                                               long chatId,
                                               String[] keywords,
                                               TPage page) {
+
         ChatPaginator paginator = new ChatPaginator(client, chatId, page.pageSize);
-        CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
-
-        TdApi.FoundChatMessages[] messages = {null};
-        for (String keyword : keywords) {
-            for (int i = 1; i <= page.pageNumber; i++) {
-                chain = chain.thenCompose(v -> paginator.getPage(keyword))
-                        .thenAccept(_messages -> messages[0] = _messages);
-            }
-        }
-        chain.thenRun(() -> System.out.println(
-                Arrays.stream(messages[0].messages)
-                .map(MessageMapper::toDTO)
-                .toList().subList(1, messages[0].messages.length)));
-
+        CompletableFuture<TdApi.FoundChatMessages> chain = CompletableFuture.completedFuture(null);
+        for (String keyword : keywords)
+            for (int i = 0; i < page.numberOfPages; i++)
+                chain = chain.thenCompose(v -> paginator.getNextPage(keyword));
     }
 
-//    static TdApi.Chat getChannelByTitle(Client client,
-//                                        String chatName,
-//                                        Client.ResultHandler defaultHandler) {
-//        TdApi.Chat[] channel = new TdApi.Chat[1];
-//        client.send(new TdApi.SearchPublicChat(chatName), object -> {
-//            if (TdApi.Error.CONSTRUCTOR == object.getConstructor()) {
-//                sendMessage(getChatId(chatName), "channel '" + chatName + "' not found", client, defaultHandler);
-//                return;
-//            }
-//            TdApi.Chat chat = (TdApi.Chat) object;
-//            TdApi.ChatType chatType = chat.type;
-//            if (!(chatType.getConstructor() == TdApi.ChatTypeSupergroup.CONSTRUCTOR) ||
-//                    !((TdApi.ChatTypeSupergroup) chatType).isChannel) {
-//                sendMessage(getChatId(chatName), "'" + chatName + "'is not a channel", client, defaultHandler);
-//                return;
-//            }
-//            channel[0] = chat;
-//        });
-//        return channel[0];
-//    }
 
     static void sendMessage(long chatId,
                             String message,
@@ -107,6 +78,7 @@ public class ChatUtil {
                                     atomicBoolean.set(true);
                                 }
                             } else {
+//                                TerminalApp.appendLine(pane,TerminalApp.formattedUserLine("Receive an error for LoadChats:" + newLine + object));
                                 System.err.println("Receive an error for LoadChats:" + newLine + object);
                             }
                             break;
@@ -115,6 +87,7 @@ public class ChatUtil {
                             getMainChatList(limit, client, mainChatList, haveFullMainChatList, newLine, chats, defaultHandler);
                             break;
                         default:
+//                            TerminalApp.appendLine(pane,TerminalApp.formattedUserLine("Receive wrong response from TDLib:" + newLine + object));
                             System.err.println("Receive wrong response from TDLib:" + newLine + object);
                     }
                 });
@@ -122,12 +95,15 @@ public class ChatUtil {
             }
 
             java.util.Iterator<Example.OrderedChat> iter = mainChatList.iterator();
+//            TerminalApp.appendLine(pane,TerminalApp.formattedUserLine(""));
             System.out.println();
+//            TerminalApp.appendLine(pane,TerminalApp.formattedUserLine("First " + limit + " chat(s) out of " + mainChatList.size() + " known chat(s):"));
             System.out.println("First " + limit + " chat(s) out of " + mainChatList.size() + " known chat(s):");
             for (int i = 0; i < limit && i < mainChatList.size(); i++) {
                 long chatId = iter.next().chatId;
                 TdApi.Chat chat = chats.get(chatId);
                 synchronized (chat) {
+//                    TerminalApp.appendLine(pane,TerminalApp.formattedUserLine(chatId + ": " + chat.title));
                     System.out.println(chatId + ": " + chat.title);
                 }
             }
@@ -143,7 +119,8 @@ public class ChatUtil {
         return chatId;
     }
 
-    static void setChatPositions(TdApi.Chat chat, TdApi.ChatPosition[] positions, NavigableSet<Example.OrderedChat> mainChatList) {
+    static void setChatPositions(TdApi.Chat chat, TdApi.ChatPosition[]
+            positions, NavigableSet<Example.OrderedChat> mainChatList) {
         synchronized (mainChatList) {
             synchronized (chat) {
                 for (TdApi.ChatPosition position : chat.positions) {
@@ -164,5 +141,31 @@ public class ChatUtil {
             }
         }
     }
+
+    public static void setPane(JTextPane pane) {
+        ChatUtil.pane = pane;
+    }
+
+    //    static TdApi.Chat getChannelByTitle(Client client,
+//                                        String chatName,
+//                                        Client.ResultHandler defaultHandler) {
+//        TdApi.Chat[] channel = new TdApi.Chat[1];
+//        client.send(new TdApi.SearchPublicChat(chatName), object -> {
+//            if (TdApi.Error.CONSTRUCTOR == object.getConstructor()) {
+//                sendMessage(getChatId(chatName), "channel '" + chatName + "' not found", client, defaultHandler);
+//                return;
+//            }
+//            TdApi.Chat chat = (TdApi.Chat) object;
+//            TdApi.ChatType chatType = chat.type;
+//            if (!(chatType.getConstructor() == TdApi.ChatTypeSupergroup.CONSTRUCTOR) ||
+//                    !((TdApi.ChatTypeSupergroup) chatType).isChannel) {
+//                sendMessage(getChatId(chatName), "'" + chatName + "'is not a channel", client, defaultHandler);
+//                return;
+//            }
+//            channel[0] = chat;
+//        });
+//        return channel[0];
+//    }
+
 }
 
