@@ -59,7 +59,7 @@ public final class Example {
              gc <chatId> - GetChat,
              me - GetMe,
              sm <chatId> <message> - SendMessage,
-             scw <chat name comma separated> <keywords comma separated> [size] - search chats for given keywords,
+             scw <chat name comma separated> <keywords comma separated> [size] [page-size] - search chats for given keywords,
              lo - LogOut,
              q - Quit
             ):\s""";
