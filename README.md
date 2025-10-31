@@ -6,8 +6,7 @@
 
 ## 📘 Overview
 
-This is a **TDLib-based Telegram client** that searches for **specific keywords** across selected Telegram channels.  
-It’s intended for analysis, research, or content filtering purposes.
+This is a **TDLib-based Telegram client** that searches for **specific keywords** across selected Telegram channels.
 
 ---
 
