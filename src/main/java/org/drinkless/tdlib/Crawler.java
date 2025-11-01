@@ -7,11 +7,10 @@
 package org.drinkless.tdlib;
 
 
+
 import javax.swing.*;
-import java.io.BufferedReader;
 import java.io.IOError;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,38 +21,42 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.drinkless.tdlib.ChatUtil.*;
+import static org.drinkless.tdlib.TerminalApp.*;
 
 /**
  * Example class for TDLib usage from Java.
  */
-public final class Example {
-    private static Client client = null;
+public final class Crawler {
+    static Client client = null;
 
-    private static TdApi.AuthorizationState authorizationState = null;
-    private static volatile boolean haveAuthorization = false;
-    private static volatile boolean needQuit = false;
-    private static volatile boolean canQuit = false;
+    static TdApi.AuthorizationState authorizationState = null;
+    static volatile boolean haveAuthorization = false;
+    static volatile boolean needQuit = false;
+    static volatile boolean canQuit = false;
 
-    private static final Client.ResultHandler defaultHandler = new DefaultHandler();
+    static final Client.ResultHandler defaultHandler = new DefaultHandler();
 
-    private static final Lock authorizationLock = new ReentrantLock();
-    private static final Condition gotAuthorization = authorizationLock.newCondition();
+    static final Lock authorizationLock = new ReentrantLock();
+    static final Condition gotAuthorization = authorizationLock.newCondition();
 
-    private static final ConcurrentMap<Long, TdApi.User> users = new ConcurrentHashMap<Long, TdApi.User>();
-    private static final ConcurrentMap<Long, TdApi.BasicGroup> basicGroups = new ConcurrentHashMap<Long, TdApi.BasicGroup>();
-    private static final ConcurrentMap<Long, TdApi.Supergroup> supergroups = new ConcurrentHashMap<Long, TdApi.Supergroup>();
-    private static final ConcurrentMap<Integer, TdApi.SecretChat> secretChats = new ConcurrentHashMap<Integer, TdApi.SecretChat>();
+    static final Lock waitForInput = new ReentrantLock();
+    static final Condition gotInput = waitForInput.newCondition();
 
-    private static final ConcurrentMap<Long, TdApi.Chat> chats = new ConcurrentHashMap<Long, TdApi.Chat>();
-    private static final NavigableSet<OrderedChat> mainChatList = new TreeSet<OrderedChat>();
-    private static boolean haveFullMainChatList = false;
+    static final ConcurrentMap<Long, TdApi.User> users = new ConcurrentHashMap<Long, TdApi.User>();
+    static final ConcurrentMap<Long, TdApi.BasicGroup> basicGroups = new ConcurrentHashMap<Long, TdApi.BasicGroup>();
+    static final ConcurrentMap<Long, TdApi.Supergroup> supergroups = new ConcurrentHashMap<Long, TdApi.Supergroup>();
+    static final ConcurrentMap<Integer, TdApi.SecretChat> secretChats = new ConcurrentHashMap<Integer, TdApi.SecretChat>();
 
-    private static final ConcurrentMap<Long, TdApi.UserFullInfo> usersFullInfo = new ConcurrentHashMap<Long, TdApi.UserFullInfo>();
-    private static final ConcurrentMap<Long, TdApi.BasicGroupFullInfo> basicGroupsFullInfo = new ConcurrentHashMap<Long, TdApi.BasicGroupFullInfo>();
-    private static final ConcurrentMap<Long, TdApi.SupergroupFullInfo> supergroupsFullInfo = new ConcurrentHashMap<Long, TdApi.SupergroupFullInfo>();
+    static final ConcurrentMap<Long, TdApi.Chat> chats = new ConcurrentHashMap<Long, TdApi.Chat>();
+    static final NavigableSet<OrderedChat> mainChatList = new TreeSet<OrderedChat>();
+    static boolean haveFullMainChatList = false;
 
-    private static final String newLine = System.lineSeparator();
-    private static final String commandsLine = """
+    static final ConcurrentMap<Long, TdApi.UserFullInfo> usersFullInfo = new ConcurrentHashMap<Long, TdApi.UserFullInfo>();
+    static final ConcurrentMap<Long, TdApi.BasicGroupFullInfo> basicGroupsFullInfo = new ConcurrentHashMap<Long, TdApi.BasicGroupFullInfo>();
+    static final ConcurrentMap<Long, TdApi.SupergroupFullInfo> supergroupsFullInfo = new ConcurrentHashMap<Long, TdApi.SupergroupFullInfo>();
+
+    static final String newLine = System.lineSeparator();
+    static final String commandsLine = """
             Enter command :(
              gcs - GetChats [limit],
              gc <chatId> - GetChat,
@@ -63,41 +66,41 @@ public final class Example {
              lo - LogOut,
              q - Quit
             ):\s""";
-    private static final String warningsLine = """
+    static final String warningsLine = """
             WARNING!
             DO NOT LOG INTO YOUR ACCOUNT FROM TOO MANY DEVICES,
             AS THIS MAY PREVENT NEW DEVICES FROM SENDING REQUESTS TO THE SERVER.
             ====================================================================
             """;
-    private static volatile String currentPrompt = null;
-    private static JTextPane pane;
+    static volatile String currentPrompt = null;
+    static JTextPane console;
 
-    private static void print(String str) {
-        if (currentPrompt != null) {
-//            appendLine(pane,TerminalApp.formattedUserLine(""));
-            System.out.println("");
-        }
-//        appendLine(pane,TerminalApp.formattedUserLine(str));
-        System.out.println(str);
-        if (currentPrompt != null) {
-            System.out.print(currentPrompt);
-//            appendLine(pane,TerminalApp.formattedUserLine(currentPrompt));
-
-        }
+    public static void setConsole(JTextPane console) {
+        Crawler.console = console;
     }
 
-    public static void setPane(JTextPane pane) {
-        Example.pane = pane;
+    static void print(String str) {
+        if (currentPrompt != null) {
+            appendLine(console, formattedUserLine(""));
+//            System.out.println("");
+        }
+        appendLine(console, formattedUserLine(str));
+//        System.out.println(str);
+        if (currentPrompt != null) {
+//            System.out.print(currentPrompt);
+            appendLine(console, formattedUserLine(currentPrompt));
+//
+        }
     }
 
     private static void onAuthorizationStateUpdated(TdApi.AuthorizationState authorizationState) {
         if (authorizationState != null) {
-            Example.authorizationState = authorizationState;
+            Crawler.authorizationState = authorizationState;
         }
-        switch (Example.authorizationState.getConstructor()) {
+        switch (Crawler.authorizationState.getConstructor()) {
             case TdApi.AuthorizationStateWaitTdlibParameters.CONSTRUCTOR:
                 TdApi.SetTdlibParameters request = new TdApi.SetTdlibParameters();
-                request.databaseDirectory = "./lib/tdlib";
+                request.databaseDirectory = "./tdlib";
                 request.useMessageDatabase = true;
                 request.useSecretChats = true;
                 request.apiId = 94575;
@@ -109,14 +112,14 @@ public final class Example {
                 client.send(request, new AuthorizationRequestHandler());
                 break;
             case TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR: {
-                String phoneNumber = promptString("Please enter phone number: ");
+                String phoneNumber = promptString("Please enter phone number(international format): ");
                 client.send(new TdApi.SetAuthenticationPhoneNumber(phoneNumber, null), new AuthorizationRequestHandler());
                 break;
             }
             case TdApi.AuthorizationStateWaitOtherDeviceConfirmation.CONSTRUCTOR: {
-                String link = ((TdApi.AuthorizationStateWaitOtherDeviceConfirmation) Example.authorizationState).link;
-//                appendLine(pane,TerminalApp.formattedUserLine("Please confirm this login link on another device: " + link));
-                System.out.println("Please confirm this login link on another device: " + link);
+                String link = ((TdApi.AuthorizationStateWaitOtherDeviceConfirmation) Crawler.authorizationState).link;
+                appendLine(console, formattedUserLine("Please confirm this login link on another device: " + link));
+//                System.out.println("Please confirm this login link on another device: " + link);
                 break;
             }
             case TdApi.AuthorizationStateWaitEmailAddress.CONSTRUCTOR: {
@@ -171,12 +174,12 @@ public final class Example {
                 }
                 break;
             default:
-//                appendLine(pane,TerminalApp.formattedUserLine("Unsupported authorization state:" + newLine + Example.authorizationState));
-                System.err.println("Unsupported authorization state:" + newLine + Example.authorizationState);
+                appendLine(console, formattedErrorLine("Unsupported authorization state:" + newLine + Crawler.authorizationState));
+//                System.err.println("Unsupported authorization state:" + newLine + Crawler.authorizationState);
         }
     }
 
-    private static int toInt(String arg) {
+    static int toInt(String arg) {
         int result = 0;
         try {
             result = Integer.parseInt(arg);
@@ -187,79 +190,88 @@ public final class Example {
 
 
     private static String promptString(String prompt) {
-//        TerminalApp.StyledString styledString = TerminalApp.formattedUserLine(prompt);
-//        appendLine(pane,styledString);
-        System.out.print(prompt);
+        appendLine(console, formattedUserLine(prompt));
+//        System.out.print(prompt);
         currentPrompt = prompt;
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+//        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         String str = "";
-        try {
-            str = reader.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            str = reader.readLine();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
         currentPrompt = null;
-        String trimmed = str.trim();
-//        styledString = TerminalApp.formattedUserLine(trimmed);
-//        appendLine(pane,styledString);
+        String trimmed;
+        try {
+            waitForInput.lock();
+            gotInput.await();
+            trimmed = caughtCommand.trim();
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            waitForInput.unlock();
+        }
+        TerminalApp.StyledString styledString = formattedUserLine(trimmed);
+        appendLine(console, styledString);
         return trimmed;
     }
 
-     static void getCommand() {
+    static void getCommand() {
         String command = promptString(commandsLine);
         String[] commands = command.split(" ");
-        try {
-            switch (commands[0]) {
-                case "gcs": {
-                    int limit = 20;
-                    if (commands.length > 1) {
-                        limit = toInt(commands[1]);
-                    }
-                    getMainChatList(limit, client, mainChatList, haveFullMainChatList, newLine, chats, defaultHandler);
-                    break;
-                }
-                case "gc":
-                    client.send(new TdApi.GetChat(getChatId(commands[1])), defaultHandler);
-                    break;
-                case "me":
-                    client.send(new TdApi.GetMe(), defaultHandler);
-                    break;
-                case "sm": {
-                    sendMessage(getChatId(commands[1]), commands[2], client, defaultHandler);
-                    break;
-                }
-                case "lo":
-                    haveAuthorization = false;
-                    client.send(new TdApi.LogOut(), defaultHandler);
-                    break;
-                case "q":
-                    needQuit = true;
-                    haveAuthorization = false;
-                    client.send(new TdApi.Close(), defaultHandler);
-                    break;
-                case "scw":
-                    // scw akharinkhabar,Tasnimnews سرقت,آگاهی 5 5
-                    String[] chatNameList = commands[1].split(",");
-                    String[] keywords = commands[2].split(",");
-                    int size = 0, numberOfPages = 0;
-                    if (commands.length > 3)
-                        size = Integer.parseInt(commands[3]);
-                    if (commands.length > 4)
-                        numberOfPages = Integer.parseInt(commands[4]);
-                    for (String chatName : chatNameList)
-                        getMessagesByKeywordsInChannelTitle(client,
-                                chatName,
-                                keywords,
-                                TPage.of(0, numberOfPages, size, 0),
-                                defaultHandler);
-                    break;
-                default:
-//                    appendLine(pane,TerminalApp.formattedUserLine("Unsupported command: " + command));
-                    System.err.println("Unsupported command: " + command);
-            }
-        } catch (ArrayIndexOutOfBoundsException e) {
-            print("Not enough arguments");
-        }
+//        try {
+//            switch (commands[0]) {
+//                case "gcs": {
+//                    int limit = 20;
+//                    if (commands.length > 1) {
+//                        limit = toInt(commands[1]);
+//                    }
+//                    getMainChatList(console, limit, client, mainChatList, haveFullMainChatList, newLine, chats, defaultHandler);
+//                    break;
+//                }
+//                case "gc":
+//                    client.send(new TdApi.GetChat(getChatId(commands[1])), defaultHandler);
+//                    break;
+//                case "me":
+//                    client.send(new TdApi.GetMe(), defaultHandler);
+//                    break;
+//                case "sm": {
+//                    sendMessage(getChatId(commands[1]), commands[2], client, defaultHandler);
+//                    break;
+//                }
+//                case "lo":
+//                    haveAuthorization = false;
+//                    client.send(new TdApi.LogOut(), defaultHandler);
+//                    break;
+//                case "q":
+//                    needQuit = true;
+//                    haveAuthorization = false;
+//                    client.send(new TdApi.Close(), defaultHandler);
+//                    break;
+//                case "scw":
+//                    // scw akharinkhabar,Tasnimnews سرقت,آگاهی 5 5
+//                    String[] chatNameList = commands[1].split(",");
+//                    String[] keywords = commands[2].split(",");
+//                    int size = 0, numberOfPages = 0;
+//                    if (commands.length > 3)
+//                        size = Integer.parseInt(commands[3]);
+//                    if (commands.length > 4)
+//                        numberOfPages = Integer.parseInt(commands[4]);
+//                    for (String chatName : chatNameList)
+//                        getMessagesByKeywordsInChannelTitle(console, client,
+//                                chatName,
+//                                keywords,
+//                                TPage.of(0, numberOfPages, size, 0),
+//                                defaultHandler);
+//                    break;
+//                default:
+//                    appendLine(console, TerminalApp.formattedErrorLine("Unsupported command: " + command));
+//                    System.err.println("Unsupported command: " + command);
+//            }
+//        } catch (ArrayIndexOutOfBoundsException e) {
+//            print("Not enough arguments");
+//        }
     }
 
 
@@ -279,12 +291,11 @@ public final class Example {
             // create client
             client = Client.create(new UpdateHandler(), null, null);
 
-            // main loop
+//             main loop
             while (!needQuit) {
-//                appendLine(pane, formattedSystemLine("Tips: ↑/↓ history • Ctrl+L clear • Ctrl+R toggle input RTL/LTR."));
-
-//                appendLine(pane,TerminalApp.formattedWarnLine(warningsLine));
-                System.out.println(warningsLine);
+                appendLine(console, formattedSystemLine("Tips: ↑/↓ history • Ctrl+L clear • Ctrl+R toggle input RTL/LTR • Console will be cleared if it holds more than 10kb"));
+                appendLine(console, formattedWarnLine(warningsLine));
+//                System.out.println(warningsLine);
                 // await authorization
                 authorizationLock.lock();
                 try {
@@ -660,16 +671,16 @@ public final class Example {
         public void onResult(TdApi.Object object) {
             switch (object.getConstructor()) {
                 case TdApi.Error.CONSTRUCTOR:
-//                    appendLine(pane,TerminalApp.formattedUserLine("Receive an error:" + newLine + object));
-                    System.err.println("Receive an error:" + newLine + object);
+                    appendLine(console, formattedErrorLine("Receive an error:" + newLine + object));
+//                    System.err.println("Receive an error:" + newLine + object);
                     onAuthorizationStateUpdated(null); // repeat last action
                     break;
                 case TdApi.Ok.CONSTRUCTOR:
                     // result is already received through UpdateAuthorizationState, nothing to do
                     break;
                 default:
-//                    appendLine(pane,TerminalApp.formattedUserLine("Receive wrong response from TDLib:" + newLine + object));
-                    System.err.println("Receive wrong response from TDLib:" + newLine + object);
+                    appendLine(console, formattedErrorLine("Receive wrong response from TDLib:" + newLine + object));
+//                    System.err.println("Receive wrong response from TDLib:" + newLine + object);
             }
         }
     }
@@ -681,8 +692,8 @@ public final class Example {
                 onFatalError(message);
                 return;
             }
-//            appendLine(pane,TerminalApp.formattedUserLine(message));
-            System.err.println(message);
+            appendLine(console,formattedErrorLine(message));
+//            System.err.println(message);
         }
     }
 

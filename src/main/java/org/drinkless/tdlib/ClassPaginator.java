@@ -1,8 +1,12 @@
 package org.drinkless.tdlib;
 
+import javax.swing.*;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
+import static org.drinkless.tdlib.TerminalApp.appendLine;
+import static org.drinkless.tdlib.TerminalApp.formattedOutputLine;
 
 class ChatPaginator {
 
@@ -18,7 +22,7 @@ class ChatPaginator {
         this.pageSize = pageSize;
     }
 
-    public CompletableFuture<TdApi.FoundChatMessages> getNextPage(String keyword) {
+    public CompletableFuture<TdApi.FoundChatMessages> getNextPage(String keyword, JTextPane console,String channelName) {
         TdApi.SearchChatMessages query = new TdApi.SearchChatMessages(
                 chatId,
                 null,
@@ -39,10 +43,11 @@ class ChatPaginator {
                 fromMessageId = messages.messages[messages.messages.length - 1].id;
 
                 List<MessageDTO> lastResult = Arrays.stream(messages.messages)
-                        .map(MessageMapper::toDTO)
+                        .map(m->MessageMapper.toDTO(m,channelName))
                         .toList().subList(0, messages.messages.length - 1);
 
-                System.out.println(lastResult);
+                appendLine(console, formattedOutputLine(lastResult.toString()));
+//                System.out.println(lastResult);
 
                 future.complete(messages);
             } else {

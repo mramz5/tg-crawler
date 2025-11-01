@@ -9,9 +9,10 @@ import java.sql.Timestamp;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class MessageMapper {
 
-    public static MessageDTO toDTO(TdApi.Message message) {
+    public static MessageDTO toDTO(TdApi.Message message, String channelName) {
+        long realId = message.id >> 20;
         MessageDTO dto = new MessageDTO();
-        dto.id = message.id;
+        dto.id = realId;
         dto.content = message.content instanceof TdApi.MessageText ? ((TdApi.MessageText) message.content).text :
                 message.content instanceof TdApi.MessagePhoto ? ((TdApi.MessagePhoto) message.content).caption :
                         message.content instanceof TdApi.MessageVideo ? ((TdApi.MessageVideo) message.content).caption :
@@ -24,6 +25,7 @@ public class MessageMapper {
                                                                                 message.content instanceof TdApi.MessagePaidMedia ? ((TdApi.MessagePaidMedia) message.content).caption :
                                                                                         null;
         dto.date = PersianDateTime.fromGregorian(new Timestamp(message.date * 1000L).toLocalDateTime());
+        dto.messageLink = "https://t.me/" + channelName + "/" + realId;
         return dto;
     }
 }
