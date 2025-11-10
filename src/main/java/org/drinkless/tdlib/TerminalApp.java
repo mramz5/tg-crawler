@@ -4,24 +4,29 @@ import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.net.URI;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 
+import static java.lang.Character.isWhitespace;
 import static org.drinkless.tdlib.ChatUtil.*;
-import static org.drinkless.tdlib.ChatUtil.getChatId;
-import static org.drinkless.tdlib.ChatUtil.getMessagesByKeywordsInChannelTitle;
 import static org.drinkless.tdlib.Crawler.*;
 
 public class TerminalApp {
+    static final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
     static final JTextPane console = new JTextPane();
     static final JTextField input = new JTextField();
     static String caughtCommand;
     static List<String> history = new ArrayList<>();
     static final int[] histIndex = {-1};
+    static final Color BLACK_GREY = new Color(30, 30, 30);
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(TerminalApp::createAndShow);
@@ -41,8 +46,8 @@ public class TerminalApp {
 
     static JTextField getTextField() {
         // --- Input field ---
-        input.setFont(new Font("DialogInput", Font.PLAIN, 16));
-        input.setBackground(Color.BLACK);
+        input.setFont(new Font("Tahoma", Font.PLAIN, 16));
+        input.setBackground(BLACK_GREY);
         input.setForeground(Color.WHITE);
         input.setCaretColor(Color.WHITE);
         input.requestFocusInWindow();
@@ -52,12 +57,12 @@ public class TerminalApp {
 
     static JPanel getBottom(JFrame frame, JTextField input) {
         JLabel prompt = new JLabel(">");
-        prompt.setFont(new Font("DialogInput", Font.BOLD, 16));
+        prompt.setFont(new Font("Tahoma", Font.BOLD, 16));
         prompt.setForeground(new Color(31, 115, 3));
         prompt.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
 
         JPanel bottom = new JPanel(new BorderLayout(8, 0));
-        bottom.setBackground(Color.BLACK);
+        bottom.setBackground(BLACK_GREY);
         bottom.add(prompt, BorderLayout.WEST);
         bottom.add(input, BorderLayout.CENTER);
 
@@ -71,11 +76,15 @@ public class TerminalApp {
             console = new JTextPane();
 
         console.setEditable(false);
-        console.setFont(new Font("DialogInput", Font.PLAIN, 15));
-        console.setBackground(Color.BLACK);
-        console.setForeground(Color.WHITE);
+        console.setFont(new Font("Tahoma", Font.PLAIN, 15));
+        console.setBackground(BLACK_GREY);
+        console.setForeground(BLACK_GREY);
         DefaultCaret caret = (DefaultCaret) console.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+
+        int topMargin = (int) (screenSize.height * 0.03);
+        int leftMargin = (int) (screenSize.width * 0.03);
+        console.setMargin(new Insets(topMargin, leftMargin, topMargin, (int) (screenSize.width * 0.7)));
         return console;
     }
 
@@ -207,7 +216,6 @@ public class TerminalApp {
             JScrollPane scrollPane = TerminalApp.getScrollPane(textPane, frame);
 
 
-
             addInputHistoryListener(input);
             addInputClearListener(input, textPane);
             addInputOrientationListener(input);
@@ -232,9 +240,9 @@ public class TerminalApp {
 
     // ---------- Async handler ----------
     private static Function<String, CompletableFuture<String>> demoHandler(ExecutorService pool) {
-        //if more than 10kb then clear the console
-        if (console.getText().length() > 1024 * 10)
-            console.setText("");
+//        if more than 10kb then clear the console
+//        if (console.getText().length() > 1024 * 10)
+//            console.setText("");
         return command -> CompletableFuture.supplyAsync(() -> {
             try {
                 caughtCommand = command;
@@ -243,7 +251,7 @@ public class TerminalApp {
                     gotInput.signal();
                 }
 
-                String[] commands = command.split(" ");
+                String[] commands = command.split("\\s+", 2);
 
                 switch (commands[0]) {
                     case "gcs": {
@@ -275,14 +283,76 @@ public class TerminalApp {
                         System.exit(0);
                         break;
                     case "scw":
-                        // scw akharinkhabar,Tasnimnews سرقت,آگاهی 5 5
-                        String[] chatNameList = commands[1].split(",");
-                        String[] keywords = commands[2].split(",");
-                        int size = 0, numberOfPages = 0;
-                        if (commands.length > 3)
-                            size = Integer.parseInt(commands[3]);
-                        if (commands.length > 4)
-                            numberOfPages = Integer.parseInt(commands[4]);
+                        String unRefinedCommand = commands[1];
+//                        scw    --words سردار قنبری  , سردار به گذر   , سرقت از بانک   --chats tasnimnews,akharinkhabar   , farsna     --page 5   --size 10
+                        int startOfChannels = unRefinedCommand.indexOf("--chats") + 7, stopOfChannels = 0;
+                        int startOfWords = unRefinedCommand.indexOf("--words") + 7, stopOfWords = 0;
+                        int startOfPage = unRefinedCommand.indexOf("--page") + 6, stopOfPage = 0;
+                        int startOfSize = unRefinedCommand.indexOf("--size") + 6, stopOfSize = 0;
+
+                        boolean stopOfChannelsSet = false,
+                                stopOfWordsSet = false,
+                                stopOfPageSet = false,
+                                stopOfSizeSet = false;
+
+                        if (!isWhitespace(unRefinedCommand.charAt(startOfChannels))
+                                || !isWhitespace(unRefinedCommand.charAt(startOfWords))
+                                || !isWhitespace(unRefinedCommand.charAt(startOfPage))
+                                || !isWhitespace(unRefinedCommand.charAt(startOfSize)))
+                            throw new IllegalArgumentException("invalid command");
+
+
+                        for (int i = 0; i < unRefinedCommand.length(); i++) {
+                            if (i >= startOfChannels && (i == startOfWords || i == startOfPage || i == startOfSize || i == unRefinedCommand.length() - 1) && !stopOfChannelsSet) {
+                                stopOfChannels = (i == startOfWords ? i - 7 : i == unRefinedCommand.length() - 1 ? i : i - 6); // i-6 is for both page anz size
+                                stopOfChannelsSet = true;
+                            }
+
+                            if (i >= startOfWords && (i == startOfChannels || i == startOfPage || i == startOfSize || i == unRefinedCommand.length() - 1) && !stopOfWordsSet) {
+                                stopOfWords = (i == startOfChannels ? i - 7 : i == unRefinedCommand.length() - 1 ? i : i - 6);
+                                stopOfWordsSet = true;
+                            }
+
+                            if (i >= startOfPage && (i == startOfChannels || i == startOfWords || i == startOfSize || i == unRefinedCommand.length() - 1) && !stopOfPageSet) {
+                                stopOfPage = (i == startOfChannels || i == startOfWords ? i - 7 : i == unRefinedCommand.length() - 1 ? i + 1 : i - 6);
+                                stopOfPageSet = true;
+                            }
+
+                            if (i >= startOfSize && (i == startOfChannels || i == startOfWords || i == startOfPage || i == unRefinedCommand.length() - 1) && !stopOfSizeSet) {
+                                stopOfSize = (i == startOfChannels || i == startOfWords ? i - 7 : i == unRefinedCommand.length() - 1 ? i + 1 : i - 6);
+                                stopOfSizeSet = true;
+                            }
+                        }
+
+
+                        List<String> chatNameList = Arrays.stream(unRefinedCommand
+                                        .substring(startOfChannels, stopOfChannels)
+                                        .split(","))
+                                .map(String::trim)
+                                .toList();
+
+                        String[] keywords = Arrays.stream(unRefinedCommand
+                                        .substring(startOfWords, stopOfWords)
+                                        .trim()
+                                        .split(","))
+                                .map(String::trim)
+                                .toArray(String[]::new);
+//
+                        int numberOfPages = startOfPage == 0 ? 1 : Integer.parseInt(unRefinedCommand
+                                .substring(startOfPage, stopOfPage)
+                                .trim());
+
+                        int size = stopOfSize == 0 ? 10 : Integer.parseInt(unRefinedCommand
+                                .substring(startOfSize, stopOfSize)
+                                .trim());
+
+//                        String[] chatNameList = commands[1].split(",");
+//                        String[] keywords = commands[2].split(",");
+//                        int size = 0, numberOfPages = 0;
+//                        if (commands.length > 3)
+//                            size = Integer.parseInt(commands[3]);
+//                        if (commands.length > 4)
+//                            numberOfPages = Integer.parseInt(commands[4]);
 
                         for (String chatName : chatNameList)
                             getMessagesByKeywordsInChannelTitle(console, client,
@@ -305,48 +375,117 @@ public class TerminalApp {
         }, pool);
     }
 
+//    String[] extractKeywords(String input) {
+//        String trimmed = input.trim();
+//        int numberOfDQ = 0, stop = 0;
+//        int start = trimmed.indexOf("\"");
+//        for (int i = 0; i < trimmed.length(); i++) {
+//            if (trimmed.charAt(i) == '"') {
+//                stop = i;
+//                numberOfDQ++;
+//            }
+//            if (numberOfDQ %2==0)
+//                return input.
+//
+//        }
+//    }
+
     // ---------- Console printing ----------
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     static void appendLine(JTextPane pane, StyledString s) {
-        SwingUtilities.invokeLater(() -> {
-            StyledDocument doc = pane.getStyledDocument();
-            try {
-                doc.insertString(doc.getLength(), s.text + "\n", style(s));
-                pane.setCaretPosition(doc.getLength());
-            } catch (BadLocationException e) {
-                e.printStackTrace();
+//        SwingUtilities.invokeLater(() -> {
+        StyledDocument doc = pane.getStyledDocument();
+        try {
+            doc.insertString(doc.getLength(), s.text + "\n", style(s));
+            pane.setCaretPosition(doc.getLength());
+        } catch (BadLocationException e) {
+            e.printStackTrace();
+        }
+//        });
+    }
+
+    //append link button with line break
+    static void appendLinkButtonLB(JTextPane pane, String link) {
+
+        JButton linkButton = getLikButton();
+
+        addLinkListener(link, linkButton);
+        console.insertComponent(linkButton);
+
+        StyledString styledLB = new StyledString("\n}", Color.WHITE, false);
+
+        StyledDocument doc = pane.getStyledDocument();
+        try {
+            doc.insertString(doc.getLength(), styledLB.text, style(styledLB));
+            pane.setCaretPosition(doc.getLength());
+        } catch (BadLocationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static JButton getLikButton() {
+        JButton linkButton = new JButton("Link");
+        Color normal = new Color(4, 98, 152);
+        Color hover = new Color(8, 72, 119);
+        Color press = new Color(5, 36, 58);
+        linkButton.setBackground(normal);
+        linkButton.setContentAreaFilled(false);
+        linkButton.setForeground(new Color(211, 211, 211));
+        linkButton.setMargin(new Insets(1, 5, 1, 5));
+        linkButton.setOpaque(true);
+        linkButton.setRolloverEnabled(true);
+        linkButton.setFont(new Font("Tahoma", Font.BOLD, 14));
+
+        linkButton.getModel().addChangeListener(e -> {
+            ButtonModel m = linkButton.getModel();
+            linkButton.setBackground(m.isPressed() ? press : (m.isRollover() ? hover : normal));
+        });
+        return linkButton;
+    }
+
+    static void addLinkListener(String link, JButton linkButton) {
+        linkButton.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getButton() == 1) {
+                    try {
+                        Desktop.getDesktop().browse(new URI(link));
+                    } catch (Exception ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
             }
         });
     }
 
     static StyledString formattedErrorLine(String input) {
-        String ts = "[" + LocalTime.now().format(TS) + "]";
+        String ts = "\n[" + LocalTime.now().format(TS) + "]";
         return new StyledString(ts + " $ " + input, new Color(112, 15, 15), true);
     }
 
     static StyledString formattedWarnLine(String input) {
-        String ts = "[" + LocalTime.now().format(TS) + "]";
+        String ts = "\n[" + LocalTime.now().format(TS) + "]";
         return new StyledString(ts + " $ " + input, new Color(158, 155, 8), true);
     }
 
     static StyledString formattedUserLine(String input) {
-        String ts = "[" + LocalTime.now().format(TS) + "]";
+        String ts = "\n[" + LocalTime.now().format(TS) + "]";
         return new StyledString(ts + " $ " + input, new Color(31, 115, 3), true);
     }
 
     static StyledString formattedOutputLine(String out) {
-        String ts = "[" + LocalTime.now().format(TS) + "]";
+        String ts = "\n[" + LocalTime.now().format(TS) + "]";
         return new StyledString(ts + " > " + out, Color.WHITE, false);
     }
 
     static StyledString formattedSystemLine(String msg) {
-        String ts = "[" + LocalTime.now().format(TS) + "]";
+        String ts = "\n[" + LocalTime.now().format(TS) + "]";
         return new StyledString(ts + " # " + msg, Color.CYAN, false);
     }
 
     private static StyledString formattedErrorLine(Throwable ex) {
-        String ts = "[" + LocalTime.now().format(TS) + "]";
+        String ts = "\n[" + LocalTime.now().format(TS) + "]";
         return new StyledString(ts + " ! " + (ex.getMessage() == null ? ex.toString() : ex.getMessage()),
                 Color.RED, false);
     }
@@ -358,7 +497,7 @@ public class TerminalApp {
         SimpleAttributeSet as = new SimpleAttributeSet();
         StyleConstants.setForeground(as, s.color());
         StyleConstants.setBold(as, s.bold());
-        StyleConstants.setFontFamily(as, "DialogInput");
+        StyleConstants.setFontFamily(as, "Tahoma");
         StyleConstants.setFontSize(as, 15);
         return as;
     }

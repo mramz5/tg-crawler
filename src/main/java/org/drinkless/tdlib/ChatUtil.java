@@ -46,7 +46,10 @@ public class ChatUtil {
         CompletableFuture<TdApi.FoundChatMessages> chain = CompletableFuture.completedFuture(null);
         for (String keyword : keywords)
             for (int i = 0; i < page.numberOfPages; i++)
-                chain = chain.thenCompose(v -> paginator.getNextPage(keyword, console, channelName));
+                chain = chain.thenCompose(v -> {
+                    System.out.println("console.getComponentCount() : " + console.getComponentCount());
+                    return paginator.getNextPage(keyword, console, channelName);
+                });
     }
 
 

@@ -5,8 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import static org.drinkless.tdlib.TerminalApp.appendLine;
-import static org.drinkless.tdlib.TerminalApp.formattedOutputLine;
+import static org.drinkless.tdlib.TerminalApp.*;
 
 class ChatPaginator {
 
@@ -46,7 +45,12 @@ class ChatPaginator {
                         .map(m->MessageMapper.toDTO(m,channelName))
                         .toList().subList(0, messages.messages.length - 1);
 
-                appendLine(console, formattedOutputLine(lastResult.toString()));
+                for (MessageDTO messageDTO : lastResult) {
+                    appendLine(console, formattedOutputLine(messageDTO.firstPartToString()));
+                    appendLinkButtonLB(console, messageDTO.messageLink);
+                }
+
+//                appendLine(console, formattedOutputLine(lastResult.toString()));
 //                System.out.println(lastResult);
 
                 future.complete(messages);

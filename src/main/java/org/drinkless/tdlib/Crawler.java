@@ -7,7 +7,6 @@
 package org.drinkless.tdlib;
 
 
-
 import javax.swing.*;
 import java.io.IOError;
 import java.io.IOException;
@@ -20,7 +19,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.drinkless.tdlib.ChatUtil.*;
+import static org.drinkless.tdlib.ChatUtil.setChatPositions;
 import static org.drinkless.tdlib.TerminalApp.*;
 
 /**
@@ -62,7 +61,7 @@ public final class Crawler {
              gc <chatId> - GetChat,
              me - GetMe,
              sm <chatId> <message> - SendMessage,
-             scw <chat name comma separated> <keywords comma separated> [size] [page-size] - search chats for given keywords,
+             scw {--chats chats comma separated} {--words keywords comma separated} [--size size] [--page size] - search chats for given keywords,
              lo - LogOut,
              q - Quit
             ):\s""";
@@ -250,7 +249,7 @@ public final class Crawler {
 //                    client.send(new TdApi.Close(), defaultHandler);
 //                    break;
 //                case "scw":
-//                    // scw akharinkhabar,Tasnimnews سرقت,آگاهی 5 5
+//                    // scw akharinkhabar  ,fasrsan_Ad3,  Tasnimnews سرقت,آگاهی,سردار حسنی  , یا علی   5 5
 //                    String[] chatNameList = commands[1].split(",");
 //                    String[] keywords = commands[2].split(",");
 //                    int size = 0, numberOfPages = 0;
@@ -282,6 +281,7 @@ public final class Crawler {
 
             // disable TDLib log and redirect fatal errors and plain log messages to a file
             try {
+
                 Client.execute(new TdApi.SetLogVerbosityLevel(0));
                 Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27, false)));
             } catch (Client.ExecutionException error) {
@@ -293,7 +293,8 @@ public final class Crawler {
 
 //             main loop
             while (!needQuit) {
-                appendLine(console, formattedSystemLine("Tips: ↑/↓ history • Ctrl+L clear • Ctrl+R toggle input RTL/LTR • Console will be cleared if it holds more than 10kb"));
+//                • Console will be cleared if it holds more than 10kb
+                appendLine(console, formattedSystemLine("Tips: ↑/↓ history • Ctrl+L clear • Ctrl+R toggle input RTL/LTR "));
                 appendLine(console, formattedWarnLine(warningsLine));
 //                System.out.println(warningsLine);
                 // await authorization

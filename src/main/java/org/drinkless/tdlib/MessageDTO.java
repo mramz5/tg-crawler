@@ -10,14 +10,22 @@ public class MessageDTO {
 
     @Override
     public String toString() {
-        String[] ts = date.toString().split("T");
-        return "\n{" +
-                "\n\tid : " + id +
-                " ,\n\tcontent : " + (content != null ? (content.text.replace("\n", "\n\t")) : "") +
-                " ,\n\tdate=" + ts[0] + "-" + ts[1] +
-                " ,\n\tlink=" + messageLink +
-                "\n}";
+        return firstPartToString() + secondPartToString();
     }
+
+    public String firstPartToString() {
+        String[] ts = date.toString().split("T");
+        return "\n" +
+                "\nid : " + id +
+                " ,\ncontent : " + (content != null ? (content.text.replace("\n", "\n\t")) : "") +
+                " ,\ndate=" + ts[0] + "-" + ts[1];
+    }
+
+    public String secondPartToString() {
+        return " ,\nlink=" + messageLink +
+                "\n";
+    }
+
 
     @Override
     public boolean equals(Object o) {
