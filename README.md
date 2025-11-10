@@ -1,29 +1,53 @@
-# 🧭 Telegram TDLib Crawler (Windows x64)
-
-> ⚠️ **Note:** This app is designed **only for Windows x64 users**.
-
----
-
-## 📘 Overview
-
-This is a **TDLib-based Telegram client** that searches for **specific keywords** across selected Telegram channels.
+# 🧭 **Telegram TDLib Crawler**  
+_**For Windows x64 Users Only**_
 
 ---
 
-## 🚀 How to Run
+## 📘 **Overview**
 
-### 1. Install Java 21
-Download and install **Java 21 (JDK)** from Oracle:
-
-👉 [Download JDK 21 for Windows x64](https://download.oracle.com/java/21/archive/jdk-21.0.8_windows-x64_bin.exe)
+This is a **TDLib-based Telegram client** that allows you to search for **specific keywords** across selected Telegram channels.
 
 ---
 
-### 2. Download the Application
-- Obtain the compiled JAR file (`tg-crawler-1.0-SNAPSHOT.jar`) from the `target` folder.  
-- Extract it to any folder of your choice (e.g. `C:\tg-crawler`).
+## 🚀 **How to Run**
+
+### 1. **Install Java 21**
+To run this application, you need **Java 21 (JDK)** installed.
+
+- Download and install **Java 21** from Oracle:  
+  👉 [Download JDK 21 for Windows x64](https://download.oracle.com/java/21/archive/jdk-21.0.8_windows-x64_bin.exe)
 
 ---
 
-### 3. Run the App
-Simply download and double-click the provided **`run.bat`** file 
+### 2. **Download the Application**
+
+- Obtain the compiled **JAR file** for your desired version:  
+  - For **console app**: `tg-crawler-console-1.0-SNAPSHOT.jar`  
+  - For **GUI app**: `tg-crawler-gui-1.0-SNAPSHOT.jar`
+  
+- Extract the JAR file to a folder of your choice (e.g., `C:\tg-crawler`).
+
+---
+
+### 3. **Run the App**
+
+#### **For GUI Version:**
+
+- Simply double-click on the `tg-crawler-gui-1.0-SNAPSHOT.jar` file to run the application.
+
+#### **For Console Version:**
+
+- Download the **`run.bat`** file and double-click it to start the console app.
+
+---
+
+### ⚠️ **Troubleshooting for GUI Version**
+
+If the **GUI version** doesn’t work by double-clicking, follow these steps:
+
+1. **Run Command Prompt as Administrator**.
+2. Execute the following commands to associate `.jar` files with `javaw.exe`:
+
+```bash
+assoc .jar=jarfile
+ftype jarfile="C:\path\to\jdk-21(or higher)\bin\javaw.exe" -jar "%1" %*
