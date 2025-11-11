@@ -38,7 +38,8 @@
                 <configuration>
                     <archive>
                         <manifestEntries>
-                            <Main-Class>org.drinkless.tdlib.TerminalApp</Main-Class> <!-- Replace with your main class -->
+                            <Main-Class>org.drinkless.tdlib.ui.TerminalWindow
+                            </Main-Class> <!-- Replace with your main class -->
                         </manifestEntries>
                     </archive>
                 </configuration>

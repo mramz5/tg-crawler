@@ -7,9 +7,13 @@
 package org.drinkless.tdlib;
 
 
-import javax.swing.*;
+import lombok.AllArgsConstructor;
+import org.drinkless.tdlib.ui.TerminalWindow;
+
 import java.io.IOError;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,8 +23,9 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.drinkless.tdlib.ChatUtil.setChatPositions;
-import static org.drinkless.tdlib.TerminalApp.*;
+import static org.drinkless.tdlib.ui.TerminalWindow.*;
+import static org.drinkless.tdlib.util.ChatUtil.*;
+import static org.drinkless.tdlib.util.CommandParamsExtractor.*;
 
 /**
  * Example class for TDLib usage from Java.
@@ -33,26 +38,24 @@ public final class Crawler {
     static volatile boolean needQuit = false;
     static volatile boolean canQuit = false;
 
-    static final Client.ResultHandler defaultHandler = new DefaultHandler();
-
     static final Lock authorizationLock = new ReentrantLock();
     static final Condition gotAuthorization = authorizationLock.newCondition();
 
-    static final Lock waitForInput = new ReentrantLock();
-    static final Condition gotInput = waitForInput.newCondition();
+    public static final Lock waitForInput = new ReentrantLock();
+    public static final Condition gotInput = waitForInput.newCondition();
 
-    static final ConcurrentMap<Long, TdApi.User> users = new ConcurrentHashMap<Long, TdApi.User>();
-    static final ConcurrentMap<Long, TdApi.BasicGroup> basicGroups = new ConcurrentHashMap<Long, TdApi.BasicGroup>();
-    static final ConcurrentMap<Long, TdApi.Supergroup> supergroups = new ConcurrentHashMap<Long, TdApi.Supergroup>();
-    static final ConcurrentMap<Integer, TdApi.SecretChat> secretChats = new ConcurrentHashMap<Integer, TdApi.SecretChat>();
+    static final ConcurrentMap<Long, TdApi.User> users = new ConcurrentHashMap<>();
+    static final ConcurrentMap<Long, TdApi.BasicGroup> basicGroups = new ConcurrentHashMap<>();
+    static final ConcurrentMap<Long, TdApi.Supergroup> supergroups = new ConcurrentHashMap<>();
+    static final ConcurrentMap<Integer, TdApi.SecretChat> secretChats = new ConcurrentHashMap<>();
 
-    static final ConcurrentMap<Long, TdApi.Chat> chats = new ConcurrentHashMap<Long, TdApi.Chat>();
-    static final NavigableSet<OrderedChat> mainChatList = new TreeSet<OrderedChat>();
+    static final ConcurrentMap<Long, TdApi.Chat> chats = new ConcurrentHashMap<>();
+    static final NavigableSet<OrderedChat> mainChatList = new TreeSet<>();
     static boolean haveFullMainChatList = false;
 
-    static final ConcurrentMap<Long, TdApi.UserFullInfo> usersFullInfo = new ConcurrentHashMap<Long, TdApi.UserFullInfo>();
-    static final ConcurrentMap<Long, TdApi.BasicGroupFullInfo> basicGroupsFullInfo = new ConcurrentHashMap<Long, TdApi.BasicGroupFullInfo>();
-    static final ConcurrentMap<Long, TdApi.SupergroupFullInfo> supergroupsFullInfo = new ConcurrentHashMap<Long, TdApi.SupergroupFullInfo>();
+    static final ConcurrentMap<Long, TdApi.UserFullInfo> usersFullInfo = new ConcurrentHashMap<>();
+    static final ConcurrentMap<Long, TdApi.BasicGroupFullInfo> basicGroupsFullInfo = new ConcurrentHashMap<>();
+    static final ConcurrentMap<Long, TdApi.SupergroupFullInfo> supergroupsFullInfo = new ConcurrentHashMap<>();
 
     static final String newLine = System.lineSeparator();
     static final String commandsLine = """
@@ -69,30 +72,25 @@ public final class Crawler {
             WARNING!
             DO NOT LOG INTO YOUR ACCOUNT FROM TOO MANY DEVICES,
             AS THIS MAY PREVENT NEW DEVICES FROM SENDING REQUESTS TO THE SERVER.
-            ====================================================================
+            ===================================================================
             """;
-    static volatile String currentPrompt = null;
-    static JTextPane console;
+    static volatile String currentPrompt = "";
 
-    public static void setConsole(JTextPane console) {
-        Crawler.console = console;
-    }
-
-    static void print(String str) {
+    static void print(TerminalWindow terminalWindow, String str) {
         if (currentPrompt != null) {
-            appendLine(console, formattedUserLine(""));
+            terminalWindow.appendLine(formattedUserLine(""));
 //            System.out.println("");
         }
-        appendLine(console, formattedUserLine(str));
+//        terminalWindow.appendLine(formattedUserLine(str));
 //        System.out.println(str);
         if (currentPrompt != null) {
 //            System.out.print(currentPrompt);
-            appendLine(console, formattedUserLine(currentPrompt));
+            terminalWindow.appendLine(formattedUserLine(currentPrompt));
 //
         }
     }
 
-    private static void onAuthorizationStateUpdated(TdApi.AuthorizationState authorizationState) {
+    private static void onAuthorizationStateUpdated(TdApi.AuthorizationState authorizationState, TerminalWindow terminalWindow) {
         if (authorizationState != null) {
             Crawler.authorizationState = authorizationState;
         }
@@ -108,43 +106,43 @@ public final class Crawler {
                 request.deviceModel = "Desktop";
                 request.applicationVersion = "1.0";
 
-                client.send(request, new AuthorizationRequestHandler());
+                client.send(request, new AuthorizationRequestHandler(terminalWindow));
                 break;
             case TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR: {
-                String phoneNumber = promptString("Please enter phone number(international format): ");
-                client.send(new TdApi.SetAuthenticationPhoneNumber(phoneNumber, null), new AuthorizationRequestHandler());
+                String phoneNumber = promptString(terminalWindow, "Please enter phone number(international format): ");
+                client.send(new TdApi.SetAuthenticationPhoneNumber(phoneNumber, null), new AuthorizationRequestHandler(terminalWindow));
                 break;
             }
             case TdApi.AuthorizationStateWaitOtherDeviceConfirmation.CONSTRUCTOR: {
                 String link = ((TdApi.AuthorizationStateWaitOtherDeviceConfirmation) Crawler.authorizationState).link;
-                appendLine(console, formattedUserLine("Please confirm this login link on another device: " + link));
+                terminalWindow.appendLine(formattedUserLine("Please confirm this login link on another device: " + link));
 //                System.out.println("Please confirm this login link on another device: " + link);
                 break;
             }
             case TdApi.AuthorizationStateWaitEmailAddress.CONSTRUCTOR: {
-                String emailAddress = promptString("Please enter email address: ");
-                client.send(new TdApi.SetAuthenticationEmailAddress(emailAddress), new AuthorizationRequestHandler());
+                String emailAddress = promptString(terminalWindow, "Please enter email address: ");
+                client.send(new TdApi.SetAuthenticationEmailAddress(emailAddress), new AuthorizationRequestHandler(terminalWindow));
                 break;
             }
             case TdApi.AuthorizationStateWaitEmailCode.CONSTRUCTOR: {
-                String code = promptString("Please enter email authentication code: ");
-                client.send(new TdApi.CheckAuthenticationEmailCode(new TdApi.EmailAddressAuthenticationCode(code)), new AuthorizationRequestHandler());
+                String code = promptString(terminalWindow, "Please enter email authentication code: ");
+                client.send(new TdApi.CheckAuthenticationEmailCode(new TdApi.EmailAddressAuthenticationCode(code)), new AuthorizationRequestHandler(terminalWindow));
                 break;
             }
             case TdApi.AuthorizationStateWaitCode.CONSTRUCTOR: {
-                String code = promptString("Please enter authentication code: ");
-                client.send(new TdApi.CheckAuthenticationCode(code), new AuthorizationRequestHandler());
+                String code = promptString(terminalWindow, "Please enter authentication code: ");
+                client.send(new TdApi.CheckAuthenticationCode(code), new AuthorizationRequestHandler(terminalWindow));
                 break;
             }
             case TdApi.AuthorizationStateWaitRegistration.CONSTRUCTOR: {
-                String firstName = promptString("Please enter your first name: ");
-                String lastName = promptString("Please enter your last name: ");
-                client.send(new TdApi.RegisterUser(firstName, lastName, false), new AuthorizationRequestHandler());
+                String firstName = promptString(terminalWindow, "Please enter your first name: ");
+                String lastName = promptString(terminalWindow, "Please enter your last name: ");
+                client.send(new TdApi.RegisterUser(firstName, lastName, false), new AuthorizationRequestHandler(terminalWindow));
                 break;
             }
             case TdApi.AuthorizationStateWaitPassword.CONSTRUCTOR: {
-                String password = promptString("Please enter password: ");
-                client.send(new TdApi.CheckAuthenticationPassword(password), new AuthorizationRequestHandler());
+                String password = promptString(terminalWindow, "Please enter password: ");
+                client.send(new TdApi.CheckAuthenticationPassword(password), new AuthorizationRequestHandler(terminalWindow));
                 break;
             }
             case TdApi.AuthorizationStateReady.CONSTRUCTOR:
@@ -158,126 +156,129 @@ public final class Crawler {
                 break;
             case TdApi.AuthorizationStateLoggingOut.CONSTRUCTOR:
                 haveAuthorization = false;
-                print("Logging out");
+                print(terminalWindow, "Logging out");
                 break;
             case TdApi.AuthorizationStateClosing.CONSTRUCTOR:
                 haveAuthorization = false;
-                print("Closing");
+                print(terminalWindow, "Closing");
                 break;
             case TdApi.AuthorizationStateClosed.CONSTRUCTOR:
-                print("Closed");
+                print(terminalWindow, "Closed");
                 if (!needQuit) {
-                    client = Client.create(new UpdateHandler(), null, null); // recreate client after previous has closed
+                    client = Client.create(new UpdateHandler(terminalWindow), null, null); // recreate client after previous has closed
                 } else {
                     canQuit = true;
                 }
                 break;
             default:
-                appendLine(console, formattedErrorLine("Unsupported authorization state:" + newLine + Crawler.authorizationState));
+                terminalWindow.appendLine(formattedErrorLine("Unsupported authorization state:" + newLine + Crawler.authorizationState));
 //                System.err.println("Unsupported authorization state:" + newLine + Crawler.authorizationState);
         }
     }
 
-    static int toInt(String arg) {
-        int result = 0;
-        try {
-            result = Integer.parseInt(arg);
-        } catch (NumberFormatException ignored) {
-        }
-        return result;
-    }
 
-
-    private static String promptString(String prompt) {
-        appendLine(console, formattedUserLine(prompt));
+    private static String promptString(TerminalWindow terminalWindow, String prompt) {
+        if (!prompt.isBlank())
+            terminalWindow.appendLine(formattedUserLine(prompt));
 //        System.out.print(prompt);
         currentPrompt = prompt;
 //        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String str = "";
 //        try {
 //            str = reader.readLine();
 //        } catch (IOException e) {
 //            e.printStackTrace();
 //        }
-        currentPrompt = null;
-        String trimmed;
+        currentPrompt = "";
+        String trimmed = prompt.trim();
         try {
             waitForInput.lock();
             gotInput.await();
-            trimmed = caughtCommand.trim();
 
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
             waitForInput.unlock();
         }
-        TerminalApp.StyledString styledString = formattedUserLine(trimmed);
-        appendLine(console, styledString);
+//        terminalWindow.appendLine(formattedErrorLine(trimmed));
         return trimmed;
     }
 
-    static void getCommand() {
-        String command = promptString(commandsLine);
-        String[] commands = command.split(" ");
-//        try {
-//            switch (commands[0]) {
-//                case "gcs": {
-//                    int limit = 20;
-//                    if (commands.length > 1) {
-//                        limit = toInt(commands[1]);
-//                    }
-//                    getMainChatList(console, limit, client, mainChatList, haveFullMainChatList, newLine, chats, defaultHandler);
-//                    break;
-//                }
-//                case "gc":
-//                    client.send(new TdApi.GetChat(getChatId(commands[1])), defaultHandler);
-//                    break;
-//                case "me":
-//                    client.send(new TdApi.GetMe(), defaultHandler);
-//                    break;
-//                case "sm": {
-//                    sendMessage(getChatId(commands[1]), commands[2], client, defaultHandler);
-//                    break;
-//                }
-//                case "lo":
-//                    haveAuthorization = false;
-//                    client.send(new TdApi.LogOut(), defaultHandler);
-//                    break;
-//                case "q":
-//                    needQuit = true;
-//                    haveAuthorization = false;
-//                    client.send(new TdApi.Close(), defaultHandler);
-//                    break;
-//                case "scw":
-//                    // scw akharinkhabar  ,fasrsan_Ad3,  Tasnimnews سرقت,آگاهی,سردار حسنی  , یا علی   5 5
-//                    String[] chatNameList = commands[1].split(",");
-//                    String[] keywords = commands[2].split(",");
-//                    int size = 0, numberOfPages = 0;
-//                    if (commands.length > 3)
-//                        size = Integer.parseInt(commands[3]);
-//                    if (commands.length > 4)
-//                        numberOfPages = Integer.parseInt(commands[4]);
-//                    for (String chatName : chatNameList)
-//                        getMessagesByKeywordsInChannelTitle(console, client,
-//                                chatName,
-//                                keywords,
-//                                TPage.of(0, numberOfPages, size, 0),
-//                                defaultHandler);
-//                    break;
-//                default:
-//                    appendLine(console, TerminalApp.formattedErrorLine("Unsupported command: " + command));
-//                    System.err.println("Unsupported command: " + command);
-//            }
-//        } catch (ArrayIndexOutOfBoundsException e) {
-//            print("Not enough arguments");
-//        }
+
+    public static String getCommand(TerminalWindow terminalWindow, String promptString) {
+        String command = promptString(terminalWindow, promptString);
+        try {
+            if (!command.isEmpty()) {
+                waitForInput.lock();
+                gotInput.signal();
+                waitForInput.unlock();
+            }
+            handleInput(terminalWindow, command);
+        } catch (ArrayIndexOutOfBoundsException e) {
+            print(terminalWindow, "Not enough arguments");
+        }
+        return command;
+    }
+
+    public static void handleInput(TerminalWindow terminalWindow, String command) {
+        String[] commands = command.split("\\s+", 2);
+
+        switch (commands[0]) {
+            case "gcs": {
+                int[] limit = {20};
+                extractGCSParams(commands[1], limit);
+                getMainChatList(terminalWindow, limit[0], client, mainChatList, haveFullMainChatList, newLine, chats);
+                break;
+            }
+            case "gc":
+                client.send(new TdApi.GetChat(getChatId(commands[1])), new DefaultHandler(terminalWindow));
+                break;
+            case "me":
+                client.send(new TdApi.GetMe(), new DefaultHandler(terminalWindow));
+                break;
+            case "sm": {
+                long[] chatId = {0};
+                String[] message = {""};
+                extractSMParams(commands[1], chatId, message);
+                sendMessage(getChatId(commands[1]), commands[2], client, new DefaultHandler(terminalWindow));
+                break;
+            }
+            case "lo":
+                haveAuthorization = false;
+                client.send(new TdApi.LogOut(), new DefaultHandler(terminalWindow));
+                break;
+            case "q":
+                needQuit = true;
+                haveAuthorization = false;
+                client.send(new TdApi.Close(), new DefaultHandler(terminalWindow));
+                System.exit(0);
+                break;
+            case "scw":
+                List<String> chatNameList = new ArrayList<>(), keywords = new ArrayList<>();
+                int[] numberOfPages = {0}, size = {0};
+                String unRefinedCommand = commands[1];
+                extractSCWParams(unRefinedCommand, chatNameList, keywords, numberOfPages, size);
+
+                for (String chatName : chatNameList)
+                    getMessagesByKeywordsInChannelTitle(
+                            terminalWindow,
+                            client,
+                            chatName,
+                            keywords,
+                            TPage.of(0, numberOfPages[0], size[0], 0),
+                            new DefaultHandler(terminalWindow));
+                break;
+            default:
+                if (haveAuthorization && !command.isBlank())
+                    terminalWindow.appendLine(formattedErrorLine("Unsupported command: " + command));
+//                        System.err.println("Unsupported command: " + command);
+        }
     }
 
 
-    public static void main(String[] args) {
+    public static void run(TerminalWindow terminalWindow) {
         try {
             // set log message handler to handle only fatal errors (0) and plain log messages (-1)
-            Client.setLogMessageHandler(0, new LogMessageHandler());
+            Client.setLogMessageHandler(0, new LogMessageHandler(terminalWindow));
 
             // disable TDLib log and redirect fatal errors and plain log messages to a file
             try {
@@ -289,13 +290,15 @@ public final class Crawler {
             }
 
             // create client
-            client = Client.create(new UpdateHandler(), null, null);
+            client = Client.create(new UpdateHandler(terminalWindow), null, null);
+
+            terminalWindow.appendLine(formattedSystemLine("Tips: ↑/↓ history • Ctrl+L clear • Ctrl+R toggle input RTL/LTR "));
+            terminalWindow.appendLine(formattedWarnLine(warningsLine));
+            terminalWindow.appendLine(formattedUserLine(commandsLine));
+//
 
 //             main loop
             while (!needQuit) {
-//                • Console will be cleared if it holds more than 10kb
-                appendLine(console, formattedSystemLine("Tips: ↑/↓ history • Ctrl+L clear • Ctrl+R toggle input RTL/LTR "));
-                appendLine(console, formattedWarnLine(warningsLine));
 //                System.out.println(warningsLine);
                 // await authorization
                 authorizationLock.lock();
@@ -308,7 +311,7 @@ public final class Crawler {
                 }
 
                 while (haveAuthorization) {
-                    getCommand();
+                    getCommand(terminalWindow, currentPrompt);
                 }
             }
             while (!canQuit) {
@@ -319,11 +322,11 @@ public final class Crawler {
         }
     }
 
-    static class OrderedChat implements Comparable<OrderedChat> {
-        final long chatId;
+    public static class OrderedChat implements Comparable<OrderedChat> {
+        public final long chatId;
         final TdApi.ChatPosition position;
 
-        OrderedChat(long chatId, TdApi.ChatPosition position) {
+        public OrderedChat(long chatId, TdApi.ChatPosition position) {
             this.chatId = chatId;
             this.position = position;
         }
@@ -346,19 +349,25 @@ public final class Crawler {
         }
     }
 
+    @AllArgsConstructor
     private static class DefaultHandler implements Client.ResultHandler {
+        private TerminalWindow terminalWindow;
+
         @Override
         public void onResult(TdApi.Object object) {
-            print(object.toString());
+            print(terminalWindow, object.toString());
         }
     }
 
+    @AllArgsConstructor
     private static class UpdateHandler implements Client.ResultHandler {
+        private TerminalWindow terminalWindow;
+
         @Override
         public void onResult(TdApi.Object object) {
             switch (object.getConstructor()) {
                 case TdApi.UpdateAuthorizationState.CONSTRUCTOR:
-                    onAuthorizationStateUpdated(((TdApi.UpdateAuthorizationState) object).authorizationState);
+                    onAuthorizationStateUpdated(((TdApi.UpdateAuthorizationState) object).authorizationState, terminalWindow);
                     break;
 
                 case TdApi.UpdateUser.CONSTRUCTOR:
@@ -667,33 +676,39 @@ public final class Crawler {
         }
     }
 
+    @AllArgsConstructor
     private static class AuthorizationRequestHandler implements Client.ResultHandler {
+        private TerminalWindow terminalWindow;
+
         @Override
         public void onResult(TdApi.Object object) {
             switch (object.getConstructor()) {
                 case TdApi.Error.CONSTRUCTOR:
-                    appendLine(console, formattedErrorLine("Receive an error:" + newLine + object));
+                    terminalWindow.appendLine(formattedErrorLine("Receive an error:" + newLine + object));
 //                    System.err.println("Receive an error:" + newLine + object);
-                    onAuthorizationStateUpdated(null); // repeat last action
+                    onAuthorizationStateUpdated(null, terminalWindow); // repeat last action
                     break;
                 case TdApi.Ok.CONSTRUCTOR:
                     // result is already received through UpdateAuthorizationState, nothing to do
                     break;
                 default:
-                    appendLine(console, formattedErrorLine("Receive wrong response from TDLib:" + newLine + object));
+                    terminalWindow.appendLine(formattedErrorLine("Receive wrong response from TDLib:" + newLine + object));
 //                    System.err.println("Receive wrong response from TDLib:" + newLine + object);
             }
         }
     }
 
+    @AllArgsConstructor
     private static class LogMessageHandler implements Client.LogMessageHandler {
+        private TerminalWindow terminalWindow;
+
         @Override
         public void onLogMessage(int verbosityLevel, String message) {
             if (verbosityLevel == 0) {
                 onFatalError(message);
                 return;
             }
-            appendLine(console,formattedErrorLine(message));
+            terminalWindow.appendLine(formattedErrorLine(message));
 //            System.err.println(message);
         }
     }
