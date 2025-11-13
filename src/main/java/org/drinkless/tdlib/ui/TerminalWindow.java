@@ -13,21 +13,21 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import static org.drinkless.tdlib.Constant.*;
 import static org.drinkless.tdlib.Crawler.gotInput;
 import static org.drinkless.tdlib.Crawler.waitForInput;
 
 public class TerminalWindow {
-    private static final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-    private static final Color BLACK_GREY = new Color(30, 30, 30);
-    private static final Font terminalFont = new Font("Tahoma", Font.BOLD, 15);
-    @Getter
     private final JTextPane console = new JTextPane();
-    @Getter
     private final JTextField input = new JTextField();
     private final JFrame frame = new JFrame("tg-crawler");
     private final JScrollPane scroll = new JScrollPane(console);
     private final History history = new History(input);
+    @Getter
+    private String currentPrompt = null;
 
     static void addInputOrientationListener(JTextField input) {
         input.getInputMap(JComponent.WHEN_FOCUSED)
@@ -54,13 +54,18 @@ public class TerminalWindow {
         linkButton.setMargin(new Insets(1, 5, 1, 5));
         linkButton.setOpaque(true);
         linkButton.setRolloverEnabled(true);
-        linkButton.setFont(terminalFont);
+        linkButton.setFont(TERMINAL_FONT);
 
         linkButton.getModel().addChangeListener(e -> {
             ButtonModel m = linkButton.getModel();
             linkButton.setBackground(m.isPressed() ? press : (m.isRollover() ? hover : normal));
         });
         return linkButton;
+    }
+
+    public static StyledString formattedOutputLine(String out) {
+        String ts = "\n[" + LocalTime.now().format(TS) + "]";
+        return new StyledString(ts + " > " + out, BONE, false);
     }
 
     public static StyledString formattedErrorLine(String input) {
@@ -78,9 +83,8 @@ public class TerminalWindow {
         return new StyledString(ts + " $ " + input, new Color(31, 115, 3), true);
     }
 
-    public static StyledString formattedOutputLine(String out) {
-        String ts = "\n[" + LocalTime.now().format(TS) + "]";
-        return new StyledString(ts + " > " + out, Color.WHITE, false);
+    public int getCurrentPosition() {
+        return console.getText().length();
     }
 
     public static StyledString formattedSystemLine(String msg) {
@@ -113,7 +117,7 @@ public class TerminalWindow {
     }
 
     private JTextField setTextField() {
-        input.setFont(terminalFont);
+        input.setFont(TERMINAL_FONT);
         input.setBackground(BLACK_GREY);
         input.setForeground(Color.WHITE);
         input.setCaretColor(Color.WHITE);
@@ -126,7 +130,7 @@ public class TerminalWindow {
 
     private void getBottom(JFrame frame, JTextField input) {
         JLabel prompt = new JLabel(">");
-        prompt.setFont(terminalFont);
+        prompt.setFont(TERMINAL_FONT);
         prompt.setForeground(new Color(31, 115, 3));
         prompt.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
 
@@ -140,15 +144,15 @@ public class TerminalWindow {
 
     private JTextPane setConsole() {
         console.setEditable(false);
-        console.setFont(terminalFont);
+        console.setFont(TERMINAL_FONT);
         console.setBackground(BLACK_GREY);
         console.setForeground(BLACK_GREY);
         DefaultCaret caret = (DefaultCaret) console.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 
-        int topMargin = (int) (screenSize.height * 0.01);
-        int leftMargin = (int) (screenSize.width * 0.01);
-        int rightMargin = (int) (screenSize.width * 0.3);
+        int topMargin = (int) (SCREEN_SIZE.height * 0.01);
+        int leftMargin = (int) (SCREEN_SIZE.width * 0.01);
+        int rightMargin = (int) (SCREEN_SIZE.width * 0.3);
 
         console.setMargin(new Insets(topMargin, leftMargin, topMargin, rightMargin));
         return console;
@@ -191,6 +195,17 @@ public class TerminalWindow {
                             e.consume();
                         }
                     }
+                    default -> {
+                        //simple auto complete
+                        if (input.getText().endsWith("--c"))
+                            input.setText(input.getText() + "hats ");
+                        else if (input.getText().endsWith("--w"))
+                            input.setText(input.getText() + "ords ");
+                        else if (input.getText().endsWith("--p"))
+                            input.setText(input.getText() + "age ");
+                        else if (input.getText().endsWith("--s"))
+                            input.setText(input.getText() + "ize ");
+                    }
                 }
             }
         });
@@ -202,7 +217,7 @@ public class TerminalWindow {
         input.addActionListener(e -> {
             String cmd = input.getText();
             if (cmd == null) cmd = "";
-            String trimmed = cmd.trim();
+            String trimmed = currentPrompt = cmd.trim();
 
             if (!trimmed.isEmpty()) {
                 history.add(trimmed);
@@ -217,7 +232,7 @@ public class TerminalWindow {
                     Crawler.handleInput(this, trimmed);
                     input.setText("");
                 }, Executors.newFixedThreadPool(
-                        1,
+                        3,
                         r -> {
                             Thread t = new Thread(r, "terminal-io");
                             t.setDaemon(true);
@@ -253,14 +268,34 @@ public class TerminalWindow {
         }
     }
 
-    public void appendLine(StyledString s) {
+    public void appendAtPosition(StyledString s, int position) {
         StyledDocument doc = console.getStyledDocument();
         try {
-            doc.insertString(doc.getLength(), s.text + "\n", style(s));
+            doc.insertString(position, s.text + "\n", style(s));
             console.setCaretPosition(doc.getLength());
         } catch (BadLocationException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void appendLine(StyledString s) {
+        appendAtPosition(s, console.getStyledDocument().getLength());
+    }
+
+    public void overwriteText(StyledString s, int offset) {
+        StyledDocument doc = console.getStyledDocument();
+        Matcher matcher = Pattern.compile("news count : (\\d+)").matcher(console.getText());
+        int start, end;
+        if (matcher.find()) {
+            start = matcher.start();
+            end = matcher.end();
+            try {
+                doc.remove(offset, end - start);
+            } catch (BadLocationException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        appendAtPosition(s, offset);
     }
 
     //append link button with line break
@@ -282,7 +317,7 @@ public class TerminalWindow {
         }
     }
 
-    record StyledString(String text, Color color, boolean bold) {
+    public record StyledString(String text, Color color, boolean bold) {
     }
 
     private static AttributeSet style(StyledString s) {

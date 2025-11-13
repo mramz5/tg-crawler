@@ -9,6 +9,7 @@ package org.drinkless.tdlib;
 
 import lombok.AllArgsConstructor;
 import org.drinkless.tdlib.ui.TerminalWindow;
+import org.drinkless.tdlib.util.ObservableInteger;
 
 import java.io.IOError;
 import java.io.IOException;
@@ -22,7 +23,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import static org.drinkless.tdlib.Constant.*;
 import static org.drinkless.tdlib.ui.TerminalWindow.*;
 import static org.drinkless.tdlib.util.ChatUtil.*;
 import static org.drinkless.tdlib.util.CommandParamsExtractor.*;
@@ -58,36 +62,34 @@ public final class Crawler {
     static final ConcurrentMap<Long, TdApi.SupergroupFullInfo> supergroupsFullInfo = new ConcurrentHashMap<>();
 
     static final String newLine = System.lineSeparator();
-    static final String commandsLine = """
+    static final String commandsLine = String.format("""
             Enter command :(
-             gcs - GetChats [limit],
-             gc <chatId> - GetChat,
-             me - GetMe,
-             sm <chatId> <message> - SendMessage,
-             scw {--chats chats comma separated} {--words keywords comma separated} [--size size] [--page size] - search chats for given keywords,
-             lo - LogOut,
-             q - Quit
-            ):\s""";
+             %s - GetChats [limit],
+             %s <chatId> - GetChat,
+             %s - GetMe,
+             %s <chatId> <message> - SendMessage,
+             %s {--chats chats comma separated} {--words keywords comma separated} [--size size] [--page size] - search chats for given keywords,
+             %s - LogOut,
+             %s - Quit
+            ):\s""", GCS, GC, ME, SM, SCW, LO, Q);
     static final String warningsLine = """
             WARNING!
             DO NOT LOG INTO YOUR ACCOUNT FROM TOO MANY DEVICES,
             AS THIS MAY PREVENT NEW DEVICES FROM SENDING REQUESTS TO THE SERVER.
             ===================================================================
             """;
-    static volatile String currentPrompt = "";
+    static volatile String currentPrompt = null;
 
     static void print(TerminalWindow terminalWindow, String str) {
-        if (currentPrompt != null) {
-            terminalWindow.appendLine(formattedUserLine(""));
+        if (currentPrompt != null)
+            terminalWindow.appendLine(formattedOutputLine(currentPrompt));
 //            System.out.println("");
-        }
-//        terminalWindow.appendLine(formattedUserLine(str));
+        terminalWindow.appendLine(formattedOutputLine(str));
 //        System.out.println(str);
-        if (currentPrompt != null) {
+        if (currentPrompt != null)
 //            System.out.print(currentPrompt);
-            terminalWindow.appendLine(formattedUserLine(currentPrompt));
+            terminalWindow.appendLine(formattedOutputLine(currentPrompt));
 //
-        }
     }
 
     private static void onAuthorizationStateUpdated(TdApi.AuthorizationState authorizationState, TerminalWindow terminalWindow) {
@@ -178,28 +180,30 @@ public final class Crawler {
 
 
     private static String promptString(TerminalWindow terminalWindow, String prompt) {
-        if (!prompt.isBlank())
-            terminalWindow.appendLine(formattedUserLine(prompt));
+        if (prompt != null)
+            terminalWindow.appendLine(formattedOutputLine(prompt));
 //        System.out.print(prompt);
         currentPrompt = prompt;
 //        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String str = "";
 //        try {
 //            str = reader.readLine();
 //        } catch (IOException e) {
 //            e.printStackTrace();
 //        }
-        currentPrompt = "";
-        String trimmed = prompt.trim();
+        currentPrompt = null;
+        String trimmed;
         try {
             waitForInput.lock();
             gotInput.await();
+            trimmed = terminalWindow.getCurrentPrompt().trim();
 
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
             waitForInput.unlock();
         }
-//        terminalWindow.appendLine(formattedErrorLine(trimmed));
+        terminalWindow.appendLine(formattedUserLine(trimmed));
         return trimmed;
     }
 
@@ -223,40 +227,48 @@ public final class Crawler {
         String[] commands = command.split("\\s+", 2);
 
         switch (commands[0]) {
-            case "gcs": {
+            case GCS:
+
                 int[] limit = {20};
                 extractGCSParams(commands[1], limit);
                 getMainChatList(terminalWindow, limit[0], client, mainChatList, haveFullMainChatList, newLine, chats);
                 break;
-            }
-            case "gc":
+
+            case GC:
+
                 client.send(new TdApi.GetChat(getChatId(commands[1])), new DefaultHandler(terminalWindow));
                 break;
-            case "me":
+            case ME:
+
                 client.send(new TdApi.GetMe(), new DefaultHandler(terminalWindow));
                 break;
-            case "sm": {
+            case SM:
+
                 long[] chatId = {0};
                 String[] message = {""};
                 extractSMParams(commands[1], chatId, message);
-                sendMessage(getChatId(commands[1]), commands[2], client, new DefaultHandler(terminalWindow));
+                sendMessage(chatId[0], message[0], client, new DefaultHandler(terminalWindow));
                 break;
-            }
-            case "lo":
+
+            case LO:
+
                 haveAuthorization = false;
                 client.send(new TdApi.LogOut(), new DefaultHandler(terminalWindow));
                 break;
-            case "q":
+            case Q:
                 needQuit = true;
                 haveAuthorization = false;
                 client.send(new TdApi.Close(), new DefaultHandler(terminalWindow));
                 System.exit(0);
                 break;
-            case "scw":
+            case SCW:
+
                 List<String> chatNameList = new ArrayList<>(), keywords = new ArrayList<>();
                 int[] numberOfPages = {0}, size = {0};
                 String unRefinedCommand = commands[1];
                 extractSCWParams(unRefinedCommand, chatNameList, keywords, numberOfPages, size);
+                terminalWindow.appendLine(formattedOutputLine("\n"));
+                ObservableInteger allMessageCount = new ObservableInteger(0, terminalWindow.getCurrentPosition());
 
                 for (String chatName : chatNameList)
                     getMessagesByKeywordsInChannelTitle(
@@ -265,6 +277,7 @@ public final class Crawler {
                             chatName,
                             keywords,
                             TPage.of(0, numberOfPages[0], size[0], 0),
+                            allMessageCount,
                             new DefaultHandler(terminalWindow));
                 break;
             default:
@@ -294,8 +307,6 @@ public final class Crawler {
 
             terminalWindow.appendLine(formattedSystemLine("Tips: ↑/↓ history • Ctrl+L clear • Ctrl+R toggle input RTL/LTR "));
             terminalWindow.appendLine(formattedWarnLine(warningsLine));
-            terminalWindow.appendLine(formattedUserLine(commandsLine));
-//
 
 //             main loop
             while (!needQuit) {
@@ -311,6 +322,7 @@ public final class Crawler {
                 }
 
                 while (haveAuthorization) {
+                    terminalWindow.appendLine(formattedOutputLine(commandsLine));
                     getCommand(terminalWindow, currentPrompt);
                 }
             }
@@ -701,16 +713,26 @@ public final class Crawler {
     @AllArgsConstructor
     private static class LogMessageHandler implements Client.LogMessageHandler {
         private TerminalWindow terminalWindow;
+        private final Logger logger = Logger.getLogger(LogMessageHandler.class.getName());
 
         @Override
         public void onLogMessage(int verbosityLevel, String message) {
             if (verbosityLevel == 0) {
+                logger.log(Level.SEVERE, "Error occurred!");
                 onFatalError(message);
-                return;
+                terminalWindow.appendLine(formattedErrorLine(message));
             }
-            terminalWindow.appendLine(formattedErrorLine(message));
-//            System.err.println(message);
+            logger.log(verbosityLevel == 1 ? Level.SEVERE :
+                            verbosityLevel == 2 ? Level.INFO :
+                                    verbosityLevel == 3 ? Level.CONFIG :
+                                            verbosityLevel == 4 ? Level.FINE :
+                                                    verbosityLevel == 5 ? Level.FINER :
+                                                            Level.FINEST,
+                    message
+            );
         }
+
+
     }
 
     private static void onFatalError(String errorMessage) {

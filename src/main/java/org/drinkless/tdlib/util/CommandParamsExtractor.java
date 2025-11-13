@@ -25,7 +25,7 @@ public class CommandParamsExtractor {
                                         List<String> keywords,
                                         int[] numberOfPages,
                                         int[] size) {
-//scw  --words سردار قنبری  , سردار به گذر   , سرقت از بانک   --chats tasnimnews,akharinkhabar   , farsna     --page 5   --size 10
+        //scw  --words سردار قنبری  , سردار به گذر   , سرقت از بانک   --chats tasnimnews,akharinkhabar   , farsna     --page 5   --size 10
         int startOfChannels = unRefinedCommand.indexOf("--chats") + 7, stopOfChannels = 0;
         int startOfWords = unRefinedCommand.indexOf("--words") + 7, stopOfWords = 0;
         int startOfPage = unRefinedCommand.indexOf("--page") + 6, stopOfPage = 0;

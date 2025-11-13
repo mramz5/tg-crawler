@@ -10,7 +10,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.drinkless.tdlib.ui.TerminalWindow.*;
+import static org.drinkless.tdlib.ui.TerminalWindow.formattedErrorLine;
+import static org.drinkless.tdlib.ui.TerminalWindow.formattedOutputLine;
 
 public class ChatUtil {
 
@@ -19,6 +20,7 @@ public class ChatUtil {
                                                            String channelName,
                                                            List<String> keywords,
                                                            TPage page,
+                                                           ObservableInteger allMessageCount,
                                                            Client.ResultHandler defaultHandler) {
         client.send(new TdApi.SearchPublicChat(channelName), object -> {
             if (TdApi.Error.CONSTRUCTOR == object.getConstructor()) {
@@ -30,11 +32,11 @@ public class ChatUtil {
             TdApi.ChatType chatType = chat.type;
             if (!(chatType.getConstructor() == TdApi.ChatTypeSupergroup.CONSTRUCTOR) ||
                     !((TdApi.ChatTypeSupergroup) chatType).isChannel) {
-                terminalWindow.appendLine(formattedOutputLine("'" + channelName + "'is not a channel"));
+//                terminalWindow.appendLine(formattedOutputLine("'" + channelName + "'is not a channel"));
                 sendMessage(getChatId(channelName), "'" + channelName + "'is not a channel", client, defaultHandler);
                 return;
             }
-            getMessagesByKeywords(terminalWindow, client, chat.id, keywords, page, channelName);
+            getMessagesByKeywords(terminalWindow, client, chat.id, keywords, page, channelName, allMessageCount);
         });
     }
 
@@ -43,9 +45,10 @@ public class ChatUtil {
                                               long chatId,
                                               List<String> keywords,
                                               TPage page,
-                                              String channelName) {
+                                              String channelName,
+                                              ObservableInteger allMessageCount) {
 
-        ChatPaginator paginator = new ChatPaginator(client, chatId, page.pageSize);
+        ChatPaginator paginator = new ChatPaginator(client, chatId, page.pageSize, allMessageCount);
         CompletableFuture<TdApi.FoundChatMessages> chain = CompletableFuture.completedFuture(null);
         for (String keyword : keywords)
             for (int i = 0; i < page.numberOfPages; i++)
@@ -105,14 +108,13 @@ public class ChatUtil {
             }
 
             Iterator<Crawler.OrderedChat> iter = mainChatList.iterator();
-//            terminalWindow.appendLine(formattedUserLine(""));
-            terminalWindow.appendLine(formattedUserLine("First " + limit + " chat(s) out of " + mainChatList.size() + " known chat(s):"));
+            terminalWindow.appendLine(formattedOutputLine("First " + limit + " chat(s) out of " + mainChatList.size() + " known chat(s):"));
 //            System.out.println("First " + limit + " chat(s) out of " + mainChatList.size() + " known chat(s):");
             for (int i = 0; i < limit && i < mainChatList.size(); i++) {
                 long chatId = iter.next().chatId;
                 TdApi.Chat chat = chats.get(chatId);
                 synchronized (chat) {
-                    terminalWindow.appendLine(formattedUserLine(chatId + ": " + chat.title));
+                    terminalWindow.appendLine(formattedOutputLine(chatId + ": " + chat.title));
                 }
             }
         }

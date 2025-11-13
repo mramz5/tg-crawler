@@ -3,14 +3,26 @@ package org.drinkless.tdlib.util;
 import lombok.AllArgsConstructor;
 
 import javax.swing.*;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-@AllArgsConstructor
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+
 public class History {
     private final List<String> historyList = new ArrayList<>();
     private final JTextField input;
     private final int[] histIndex = {-1};
+
+    public History(JTextField input) {
+        this.input = input;
+        FileHistoryManager fileHistoryManager = new FileHistoryManager(this);
+        fileHistoryManager.loadHistory();
+        Runtime.getRuntime().addShutdownHook(new Thread(fileHistoryManager::saveHistory));
+    }
 
     public void setInputText() {
         input.setText(historyList.get(histIndex[0]));
@@ -42,5 +54,35 @@ public class History {
 
     public boolean isEmpty() {
         return historyList.isEmpty();
+    }
+
+    @AllArgsConstructor
+    static class FileHistoryManager {
+        private static final String fileName = "hist";
+        private History history;
+
+        void loadHistory() {
+            try {
+                Path path = Path.of(fileName);
+                if (path.toFile().exists()) {
+                    List<String> list = Files.readAllLines(path);
+                    for (String s : list)
+                        history.add(s);
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        void saveHistory() {
+            try {
+                Files.write(Path.of(fileName),
+                        history.historyList.reversed(),
+                        TRUNCATE_EXISTING,
+                        CREATE);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }
