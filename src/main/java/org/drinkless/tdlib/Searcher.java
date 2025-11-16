@@ -193,19 +193,14 @@ public final class Searcher {
     }
 
 
-    public static String getCommand(TerminalWindow terminalWindow, String promptString) {
+    public static void getCommand(TerminalWindow terminalWindow, String promptString) {
         String command = promptString(terminalWindow, promptString);
-        try {
-            if (!command.isEmpty()) {
-                waitForInput.lock();
-                gotInput.signal();
-                waitForInput.unlock();
-            }
-            handleInput(terminalWindow, command);
-        } catch (ArrayIndexOutOfBoundsException e) {
-            print(terminalWindow, "Not enough arguments");
+
+        if (!command.isEmpty()) {
+            waitForInput.lock();
+            gotInput.signal();
+            waitForInput.unlock();
         }
-        return command;
     }
 
     public static void handleInput(TerminalWindow terminalWindow, String command) {
