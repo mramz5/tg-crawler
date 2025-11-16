@@ -1,4 +1,4 @@
-# 🧭 **Telegram TDLib Crawler**  
+# 🧭 **Telegram TDLib Searcher**  
 _**For Windows x64 Users Only**_
 
 ---
@@ -22,10 +22,10 @@ To run this application, you need **Java 21 (JDK)** installed.
 ### 2. **Download the Application**
 
 - Obtain the compiled **JAR file** for your desired version:  
-  - For **console app**: `tg-crawler-console-1.0-SNAPSHOT.jar`  
-  - For **GUI app**: `tg-crawler-gui-1.0-SNAPSHOT.jar`
+  - For **console app**: `tele-search-console-1.0-SNAPSHOT.jar`  
+  - For **GUI app**: `tele-search-gui-1.0-SNAPSHOT.jar`
   
-- Extract the JAR file to a folder of your choice (e.g., `C:\tg-crawler`).
+- Extract the JAR file to a folder of your choice (e.g., `C:\tele-search`).
 
 ---
 
@@ -33,7 +33,7 @@ To run this application, you need **Java 21 (JDK)** installed.
 
 #### **For GUI Version:**
 
-- Simply double-click on the `tg-crawler-gui-1.0-SNAPSHOT.jar` file to run the application.
+- Simply double-click on the `tele-search-gui-1.0-SNAPSHOT.jar` file to run the application.
 
 #### **For Console Version:**
 
