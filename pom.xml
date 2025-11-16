@@ -3,11 +3,11 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.isoft</groupId>
-    <artifactId>tele-search</artifactId>
+    <artifactId>tele-search-gui</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
-    <name>tele-search</name>
+    <name>tele-search-gui</name>
   <url>http://maven.apache.org</url>
 
   <properties>

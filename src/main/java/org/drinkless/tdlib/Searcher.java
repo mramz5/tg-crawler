@@ -172,7 +172,6 @@ public final class Searcher {
         }
     }
 
-
     private static String promptString(TerminalWindow terminalWindow, String prompt) {
         if (prompt != null)
             terminalWindow.appendLine(formattedOutputLine(prompt));
