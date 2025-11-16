@@ -3,11 +3,11 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.isoft</groupId>
-  <artifactId>tg-crawler</artifactId>
+    <artifactId>tele-search</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
-  <name>tg-crawler</name>
+    <name>tele-search</name>
   <url>http://maven.apache.org</url>
 
   <properties>

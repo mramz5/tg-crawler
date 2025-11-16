@@ -25,7 +25,7 @@ public class CommandParamsExtractor {
                                         List<String> keywords,
                                         int[] numberOfPages,
                                         int[] size) {
-        //scw  --words سردار قنبری  , سردار به گذر   , سرقت از بانک   --chats tasnimnews,akharinkhabar   , farsna     --page 5   --size 10
+
         int startOfChannels = unRefinedCommand.indexOf("--chats") + 7, stopOfChannels = 0;
         int startOfWords = unRefinedCommand.indexOf("--words") + 7, stopOfWords = 0;
         int startOfPage = unRefinedCommand.indexOf("--page") + 6, stopOfPage = 0;
@@ -45,7 +45,7 @@ public class CommandParamsExtractor {
 
         for (int i = 0; i < unRefinedCommand.length(); i++) {
             if (i >= startOfChannels && (i == startOfWords || i == startOfPage || i == startOfSize || i == unRefinedCommand.length() - 1) && !stopOfChannelsSet) {
-                stopOfChannels = (i == startOfWords ? i - 7 : i == unRefinedCommand.length() - 1 ? i : i - 6); // i-6 is for both page anz size
+                stopOfChannels = (i == startOfWords ? i - 7 : i == unRefinedCommand.length() - 1 ? i : i - 6); // i-6 is for both page and size
                 stopOfChannelsSet = true;
             }
 
@@ -78,7 +78,7 @@ public class CommandParamsExtractor {
                         .split(","))
                 .map(String::trim)
                 .collect(() -> keywords, List::add, List::addAll);
-//
+
         numberOfPages[0] = startOfPage == 0 ? 1 : Integer.parseInt(unRefinedCommand
                 .substring(startOfPage, stopOfPage)
                 .trim());

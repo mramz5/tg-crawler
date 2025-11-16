@@ -25,15 +25,13 @@ public class ChatUtil {
         client.send(new TdApi.SearchPublicChat(channelName), object -> {
             if (TdApi.Error.CONSTRUCTOR == object.getConstructor()) {
                 terminalWindow.appendLine(formattedOutputLine("channel '" + channelName + "' not found"));
-                sendMessage(getChatId(channelName), "channel '" + channelName + "' not found", client, defaultHandler);
                 return;
             }
             TdApi.Chat chat = (TdApi.Chat) object;
             TdApi.ChatType chatType = chat.type;
             if (!(chatType.getConstructor() == TdApi.ChatTypeSupergroup.CONSTRUCTOR) ||
                     !((TdApi.ChatTypeSupergroup) chatType).isChannel) {
-//                terminalWindow.appendLine(formattedOutputLine("'" + channelName + "'is not a channel"));
-                sendMessage(getChatId(channelName), "'" + channelName + "'is not a channel", client, defaultHandler);
+                terminalWindow.appendLine(formattedOutputLine("'" + channelName + "'is not a channel"));
                 return;
             }
             getMessagesByKeywords(terminalWindow, client, chat.id, keywords, page, channelName, allMessageCount);
@@ -75,7 +73,7 @@ public class ChatUtil {
     public static void getMainChatList(TerminalWindow terminalWindow,
                                        final int limit,
                                        Client client,
-                                       NavigableSet<Crawler.OrderedChat> mainChatList,
+                                       NavigableSet<Searcher.OrderedChat> mainChatList,
                                        boolean haveFullMainChatList,
                                        String newLine,
                                        ConcurrentMap<Long, TdApi.Chat> chats) {
@@ -92,7 +90,6 @@ public class ChatUtil {
                                 }
                             } else {
                                 terminalWindow.appendLine(formattedErrorLine("Receive an error for LoadChats:" + newLine + object));
-//                                System.err.println("Receive an error for LoadChats:" + newLine + object);
                             }
                             break;
                         case TdApi.Ok.CONSTRUCTOR:
@@ -101,15 +98,13 @@ public class ChatUtil {
                             break;
                         default:
                             terminalWindow.appendLine(formattedErrorLine("Receive wrong response from TDLib:" + newLine + object));
-//                            System.err.println("Receive wrong response from TDLib:" + newLine + object);
                     }
                 });
                 return;
             }
 
-            Iterator<Crawler.OrderedChat> iter = mainChatList.iterator();
+            Iterator<Searcher.OrderedChat> iter = mainChatList.iterator();
             terminalWindow.appendLine(formattedOutputLine("First " + limit + " chat(s) out of " + mainChatList.size() + " known chat(s):"));
-//            System.out.println("First " + limit + " chat(s) out of " + mainChatList.size() + " known chat(s):");
             for (int i = 0; i < limit && i < mainChatList.size(); i++) {
                 long chatId = iter.next().chatId;
                 TdApi.Chat chat = chats.get(chatId);
@@ -130,12 +125,12 @@ public class ChatUtil {
     }
 
     public static void setChatPositions(TdApi.Chat chat, TdApi.ChatPosition[]
-            positions, NavigableSet<Crawler.OrderedChat> mainChatList) {
+            positions, NavigableSet<Searcher.OrderedChat> mainChatList) {
         synchronized (mainChatList) {
             synchronized (chat) {
                 for (TdApi.ChatPosition position : chat.positions) {
                     if (position.list.getConstructor() == TdApi.ChatListMain.CONSTRUCTOR) {
-                        boolean isRemoved = mainChatList.remove(new Crawler.OrderedChat(chat.id, position));
+                        boolean isRemoved = mainChatList.remove(new Searcher.OrderedChat(chat.id, position));
                         assert isRemoved;
                     }
                 }
@@ -144,34 +139,12 @@ public class ChatUtil {
 
                 for (TdApi.ChatPosition position : chat.positions) {
                     if (position.list.getConstructor() == TdApi.ChatListMain.CONSTRUCTOR) {
-                        boolean isAdded = mainChatList.add(new Crawler.OrderedChat(chat.id, position));
+                        boolean isAdded = mainChatList.add(new Searcher.OrderedChat(chat.id, position));
                         assert isAdded;
                     }
                 }
             }
         }
     }
-
-    //    static TdApi.Chat getChannelByTitle(Client client,
-//                                        String chatName,
-//                                        Client.ResultHandler defaultHandler) {
-//        TdApi.Chat[] channel = new TdApi.Chat[1];
-//        client.send(new TdApi.SearchPublicChat(chatName), object -> {
-//            if (TdApi.Error.CONSTRUCTOR == object.getConstructor()) {
-//                sendMessage(getChatId(chatName), "channel '" + chatName + "' not found", client, defaultHandler);
-//                return;
-//            }
-//            TdApi.Chat chat = (TdApi.Chat) object;
-//            TdApi.ChatType chatType = chat.type;
-//            if (!(chatType.getConstructor() == TdApi.ChatTypeSupergroup.CONSTRUCTOR) ||
-//                    !((TdApi.ChatTypeSupergroup) chatType).isChannel) {
-//                sendMessage(getChatId(chatName), "'" + chatName + "'is not a channel", client, defaultHandler);
-//                return;
-//            }
-//            channel[0] = chat;
-//        });
-//        return channel[0];
-//    }
-
 }
 

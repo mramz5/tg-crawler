@@ -1,7 +1,7 @@
 package org.drinkless.tdlib.ui;
 
 import lombok.Getter;
-import org.drinkless.tdlib.Crawler;
+import org.drinkless.tdlib.Searcher;
 import org.drinkless.tdlib.util.History;
 
 import javax.swing.*;
@@ -17,13 +17,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.drinkless.tdlib.Constant.*;
-import static org.drinkless.tdlib.Crawler.gotInput;
-import static org.drinkless.tdlib.Crawler.waitForInput;
+import static org.drinkless.tdlib.Searcher.gotInput;
+import static org.drinkless.tdlib.Searcher.waitForInput;
 
 public class TerminalWindow {
     private final JTextPane console = new JTextPane();
     private final JTextField input = new JTextField();
-    private final JFrame frame = new JFrame("tg-crawler");
+    private final JFrame frame = new JFrame("tele-search");
     private final JScrollPane scroll = new JScrollPane(console);
     private final History history = new History(input);
     @Getter
@@ -195,17 +195,6 @@ public class TerminalWindow {
                             e.consume();
                         }
                     }
-                    default -> {
-                        //simple auto complete
-                        if (input.getText().endsWith("--c"))
-                            input.setText(input.getText() + "hats ");
-                        else if (input.getText().endsWith("--w"))
-                            input.setText(input.getText() + "ords ");
-                        else if (input.getText().endsWith("--p"))
-                            input.setText(input.getText() + "age ");
-                        else if (input.getText().endsWith("--s"))
-                            input.setText(input.getText() + "ize ");
-                    }
                 }
             }
         });
@@ -222,14 +211,12 @@ public class TerminalWindow {
             if (!trimmed.isEmpty()) {
                 history.add(trimmed);
 
-//                Crawler.setConsole(console);
-                /* Function<String, CompletableFuture<Void>> handler = s->*/
                 CompletableFuture.runAsync(() -> {
                     waitForInput.lock();
                     gotInput.signal();
                     waitForInput.unlock();
 
-                    Crawler.handleInput(this, trimmed);
+                    Searcher.handleInput(this, trimmed);
                     input.setText("");
                 }, Executors.newFixedThreadPool(
                         3,

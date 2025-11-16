@@ -6,6 +6,6 @@ public class Main {
     public static void main(String[] args) {
         TerminalWindow main = new TerminalWindow();
         main.init();
-        Crawler.run(main);
+        Searcher.run(main);
     }
 }
